@@ -3,10 +3,10 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
-
+import mkcert from 'vite-plugin-mkcert'
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), vueDevTools()],
+  plugins: [vue(), mkcert()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -14,6 +14,7 @@ export default defineConfig({
   },
   // 新增：开发环境代理配置
   server: {
+    https: true,
     proxy: {
       '/api/v1/quizzes': {
         target: 'http://frp9.aaszxc.asia:12183',
@@ -50,7 +51,7 @@ export default defineConfig({
       // http://localhost:5173/vite/bar
       //   -> http://jsonplaceholder.typicode.com/bar
       '/vite': {
-        target: 'http://frp9.aaszxc.asia:12183/',
+        target: 'http://xfjs-api.zkyr.net.cn/',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/vite/, ''),
       },
