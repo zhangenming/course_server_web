@@ -4,7 +4,7 @@ import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 import { createApp } from 'vue'
-import Admin from './admin.vue'
+import Admin from './admin/admin.vue'
 import Login from './login.vue'
 import App from './App.vue'
 

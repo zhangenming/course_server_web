@@ -4,8 +4,11 @@ import Surveys from './surveys.vue'
 import Videos from './videos.vue'
 import Music from './music.vue'
 import Students from './students.vue'
+import Courses from './courses.vue'
 
-const active = ref<'students' | 'videos' | 'music' | 'surveys'>('students')
+const active = ref<'students' | 'videos' | 'music' | 'surveys' | 'courses'>(
+  'students'
+)
 </script>
 
 <template>
@@ -37,11 +40,16 @@ const active = ref<'students' | 'videos' | 'music' | 'surveys'>('students')
           >
             <span class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M10 9l6 3-6 3V9" />
+                <path
+                  d="M9 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2"
+                />
+                <path d="M10 3h4v2h-4z" />
+                <path d="M10 9h7" />
+                <path d="M10 13h7" />
+                <path d="M10 17h7" />
               </svg>
             </span>
-            <span class="label">视频播放记录</span>
+            <span class="label">评测管理</span>
           </button>
           <button
             class="menu-item"
@@ -50,13 +58,25 @@ const active = ref<'students' | 'videos' | 'music' | 'surveys'>('students')
           >
             <span class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <path d="M9 5h10v14H5V5h4" />
-                <path d="M9 9h8" />
-                <path d="M9 13h8" />
-                <path d="M9 17h8" />
+                <circle cx="12" cy="12" r="9" />
+                <path d="M10 9l6 3-6 3V9" />
               </svg>
             </span>
-            <span class="label">评测记录</span>
+            <span class="label">视频管理</span>
+          </button>
+          <button
+            class="menu-item"
+            :class="{ active: active === 'courses' }"
+            @click="active = 'courses'"
+          >
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 7l8-3 8 3-8 3-8-3" />
+                <path d="M4 12l8 3 8-3" />
+                <path d="M4 17l8 3 8-3" />
+              </svg>
+            </span>
+            <span class="label">课程管理</span>
           </button>
           <button
             class="menu-item"
@@ -65,13 +85,13 @@ const active = ref<'students' | 'videos' | 'music' | 'surveys'>('students')
           >
             <span class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <path d="M12 3v10" />
-                <path d="M12 13l-3 3" />
-                <path d="M12 13l3 3" />
-                <path d="M6 21h12" />
+                <path d="M12 4v9" />
+                <path d="M12 5l8-2v9" />
+                <circle cx="8" cy="17" r="3" />
+                <circle cx="18" cy="16" r="3" />
               </svg>
             </span>
-            <span class="label">数据导出</span>
+            <span class="label">音乐管理</span>
           </button>
         </nav>
       </aside>
@@ -79,8 +99,8 @@ const active = ref<'students' | 'videos' | 'music' | 'surveys'>('students')
         <Students v-if="active === 'students'" />
         <Surveys v-else-if="active === 'surveys'" />
         <Videos v-else-if="active === 'videos'" />
+        <Courses v-else-if="active === 'courses'" />
         <Music v-else-if="active === 'music'" />
-        <Students v-else />
       </main>
     </div>
   </div>
