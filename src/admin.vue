@@ -2,8 +2,9 @@
 import { ref } from 'vue'
 import Surveys from './surveys.vue'
 import Videos from './videos.vue'
+import Music from './music.vue'
 
-const active = ref<'surveys' | 'videos'>('surveys')
+const active = ref<'surveys' | 'videos' | 'music'>('surveys')
 </script>
 
 <template>
@@ -13,12 +14,14 @@ const active = ref<'surveys' | 'videos'>('surveys')
       <div class="tabs">
         <button class="tab" :class="{ active: active === 'surveys' }" @click="active = 'surveys'">问卷</button>
         <button class="tab" :class="{ active: active === 'videos' }" @click="active = 'videos'">视频</button>
+        <button class="tab" :class="{ active: active === 'music' }" @click="active = 'music'">音乐</button>
       </div>
     </div>
 
     <div class="content">
       <Surveys v-if="active === 'surveys'" />
-      <Videos v-else />
+      <Videos v-else-if="active === 'videos'" />
+      <Music v-else />
     </div>
   </div>
 </template>

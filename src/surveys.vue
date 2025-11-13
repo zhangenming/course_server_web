@@ -49,7 +49,8 @@ const createSurvey = async () => {
   shouldValidate.value = true
   // 组装符合要求的数据结构
   const payload = {
-    theme: typeof theme.value === 'string' ? theme.value : String(theme.value ?? ''),
+    theme:
+      typeof theme.value === 'string' ? theme.value : String(theme.value ?? ''),
     questions: questions.value.map(q => ({
       text: q.text ?? '',
       options: q.options.map(o => ({
@@ -60,7 +61,8 @@ const createSurvey = async () => {
     ranges: ranges.value.map(r => ({
       min: Number.isFinite(r.min) ? r.min : 0,
       label: typeof r.label === 'string' ? r.label : String(r.label ?? ''),
-      command: typeof r.command === 'string' ? r.command : r.command ?? ('' as any),
+      command:
+        typeof r.command === 'string' ? r.command : r.command ?? ('' as any),
     })),
   }
 
@@ -167,7 +169,9 @@ const maxScore = computed(() =>
     <div class="survey-header">
       <div class="title">问卷设置</div>
       <div class="header-actions">
-        <button class="btn btn-secondary" @click="createSurvey">创建问卷</button>
+        <button class="btn btn-secondary" @click="createSurvey">
+          创建问卷
+        </button>
         <span class="create-msg" v-if="createMessage">{{ createMessage }}</span>
       </div>
     </div>
@@ -184,7 +188,12 @@ const maxScore = computed(() =>
         <div class="options-list">
           <div class="field">
             <span class="field-label">标题</span>
-            <input class="input" type="text" v-model="theme" placeholder="请输入问卷标题" />
+            <input
+              class="input"
+              type="text"
+              v-model="theme"
+              placeholder="请输入问卷标题"
+            />
           </div>
         </div>
       </div>
@@ -194,11 +203,17 @@ const maxScore = computed(() =>
           <div class="options-toolbar">
             <div class="options-title">题目</div>
             <div class="toolbar-right">
-              <button class="btn btn-primary" @click="addQuestion">添加题目</button>
+              <button class="btn btn-primary" @click="addQuestion">
+                添加题目
+              </button>
             </div>
           </div>
           <div class="questions-list">
-            <div class="question-block" v-for="(q, qi) in questions" :key="'q-block-' + qi">
+            <div
+              class="question-block"
+              v-for="(q, qi) in questions"
+              :key="'q-block-' + qi"
+            >
               <!-- 题目输入（右侧两按钮与下方两列对齐，放同一行） -->
               <div class="field with-action">
                 <span class="field-label"
@@ -211,13 +226,23 @@ const maxScore = computed(() =>
                   placeholder="请输入题干"
                   :ref="el => (questionInputs[qi] = el as HTMLInputElement)"
                 />
-                <button class="btn btn-primary" @click="addOption(qi)">添加选项</button>
-                <button class="btn btn-ghost" @click="removeQuestion(qi)" :disabled="questions.length <= 1">删除题目</button>
+                <button class="btn btn-primary" @click="addOption(qi)">
+                  添加选项
+                </button>
+                <button
+                  class="btn btn-ghost"
+                  @click="removeQuestion(qi)"
+                  :disabled="questions.length <= 1"
+                >
+                  删除题目
+                </button>
               </div>
 
               <div class="options-list">
                 <div class="option-row" v-for="(o, i) in q.options" :key="i">
-                  <span class="option-label">{{ String.fromCharCode(65 + i) }}</span>
+                  <span class="option-label">{{
+                    String.fromCharCode(65 + i)
+                  }}</span>
                   <input
                     class="input"
                     type="text"
@@ -238,11 +263,20 @@ const maxScore = computed(() =>
                     placeholder="分值"
                     :class="{ invalid: shouldValidate && (o.value === null || Number.isNaN(o.value as number) || (o.value as number) < 0) }"
                   />
-                  <button class="btn btn-ghost" @click="q.options.splice(i, 1)" :disabled="q.options.length <= 1">删除选项</button>
+                  <button
+                    class="btn btn-ghost"
+                    @click="q.options.splice(i, 1)"
+                    :disabled="q.options.length <= 1"
+                  >
+                    删除选项
+                  </button>
                 </div>
               </div>
               <!-- 未填写分值提示：本题存在未填写的分值时显示 -->
-              <div class="hint-row" v-if="shouldValidate && q.options.some(o => o.value === null || Number.isNaN(o.value as number))">
+              <div
+                class="hint-row"
+                v-if="shouldValidate && q.options.some(o => o.value === null || Number.isNaN(o.value as number))"
+              >
                 提示：本题存在未填写的分值，请补充。
               </div>
             </div>
@@ -274,15 +308,47 @@ const maxScore = computed(() =>
           <div class="options-list">
             <div class="rules-row" v-for="(r, i) in ranges" :key="i">
               <span class="option-label">{{ i + 1 }}</span>
-              <input class="input score" type="number" v-model.number="r.min" min="0" step="1" inputmode="numeric" :class="{ invalid: r.min < 0 }" />
-              <input class="input" type="text" v-model="r.label" placeholder="评价标签，如：优秀" />
-              <input class="input" type="text" v-model="r.command" placeholder="命令" />
-              <button class="btn btn-ghost" @click="removeRange(i)" :disabled="ranges.length <= 1">删除</button>
+              <input
+                class="input score"
+                type="number"
+                v-model.number="r.min"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                :class="{ invalid: r.min < 0 }"
+              />
+              <input
+                class="input"
+                type="text"
+                v-model="r.label"
+                placeholder="评价标签，如：优秀"
+              />
+              <input
+                class="input"
+                type="text"
+                v-model="r.command"
+                placeholder="命令"
+              />
+              <button
+                class="btn btn-ghost"
+                @click="removeRange(i)"
+                :disabled="ranges.length <= 1"
+              >
+                删除
+              </button>
             </div>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center">
-            <div style="color: #ef4444" v-if="hasDuplicateMins">提示：存在重复的阈值，请调整。</div>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <div style="color: #ef4444" v-if="hasDuplicateMins">
+              提示：存在重复的阈值，请调整。
+            </div>
           </div>
         </div>
       </div>
@@ -330,7 +396,7 @@ const maxScore = computed(() =>
 }
 /* 通用：带操作按钮的字段行（与选项行四列对齐） */
 .field.with-action {
-  grid-template-columns: 50px minmax(140px, 1fr) 80px 80px;
+  grid-template-columns: 50px minmax(0, 1fr) 84px 84px;
 }
 .field.with-action .btn {
   width: 100%; /* 两按钮分别占据第3、4列且等宽 */
@@ -385,8 +451,9 @@ const maxScore = computed(() =>
   border-radius: 12px;
   background: #fff; /* 去掉卡片浅色底 */
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-  /* 防止内部行/输入在等分布局下溢出到另一列 */
+  /* 约束内部宽度，避免溢出 */
   overflow: hidden;
+  max-width: 100%;
 }
 .options-toolbar {
   display: flex;
@@ -417,6 +484,7 @@ const maxScore = computed(() =>
   grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
+  max-width: 100%;
 }
 .left-col,
 .right-col {
@@ -466,12 +534,12 @@ const maxScore = computed(() =>
 }
 .option-row {
   display: grid;
-  grid-template-columns: 50px minmax(140px, 1fr) 80px 80px;
+  grid-template-columns: 44px minmax(0, 1fr) 84px 84px;
   align-items: center;
   gap: 10px;
   border: none;
   border-radius: 8px;
-  background: transparent; /* 行本身透明，由外层统一底色 */
+  background: transparent;
   transition: background 0.2s;
 }
 .option-row + .option-row {
@@ -695,6 +763,7 @@ const maxScore = computed(() =>
   --space-3: 10px;
   --space-4: 12px;
   --space-5: 16px;
+  overflow-x: hidden;
 }
 
 /* 头部：粘性定位与背景/阴影，便于随时添加题目 */
@@ -850,7 +919,9 @@ const maxScore = computed(() =>
 /* 评分规则的列宽（桌面端）：让 min 更窄、label 更灵活，避免溢出 */
 .rules-header {
   display: grid;
-  grid-template-columns: 56px clamp(72px, 8vw, 100px) minmax(140px, 1fr) 250px 72px;
+  grid-template-columns:
+    56px clamp(72px, 10vw, 96px) minmax(0, 1fr) clamp(160px, 24vw, 240px)
+    84px;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
@@ -860,7 +931,9 @@ const maxScore = computed(() =>
 }
 .rules-row {
   display: grid;
-  grid-template-columns: 56px clamp(72px, 8vw, 100px) minmax(140px, 1fr) 250px 72px;
+  grid-template-columns:
+    56px clamp(72px, 10vw, 96px) minmax(0, 1fr) clamp(160px, 24vw, 240px)
+    84px;
   align-items: center;
   gap: 10px;
   padding: 10px;

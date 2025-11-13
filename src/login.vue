@@ -54,6 +54,7 @@ const submit = async () => {
 
 <template>
   <div class="login-page">
+    <div v-if="error" class="banner" role="alert" @click="error = null">{{ error }}</div>
     <div class="login-card">
       <h2>后台登录</h2>
       <div class="field">
@@ -68,7 +69,6 @@ const submit = async () => {
         <button class="btn btn-primary" :disabled="loading" @click="submit">登录</button>
       </div>
     </div>
-    <div v-if="error" class="toast" role="alert" @click="error = null">{{ error }}</div>
   </div>
 </template>
 
@@ -163,9 +163,9 @@ input {
   margin-top: 10px;
   color: #ef4444;
 }
-.toast {
+.banner {
   position: fixed;
-  bottom: 24px;
+  top: 24px;
   left: 50%;
   transform: translateX(-50%);
   background: #ef4444;

@@ -5,6 +5,7 @@ import { Record } from '@nextcas/voice'
 import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
 import { simulateClick } from './utils'
+import { replys, spks } from './config'
 
 const showBegin = ref(false)
 const showSurvey = ref(false)
@@ -48,7 +49,9 @@ const getGrade = (score: number) => {
 
 // 当前问题
 const currentQuestion = computed(() => {
-  return questions.value[currentQuestionIndex.value] || { text: '', options: [] }
+  return (
+    questions.value[currentQuestionIndex.value] || { text: '', options: [] }
+  )
 })
 
 // 是否是最后一题
@@ -57,8 +60,16 @@ const isLastQuestion = computed(() => {
 })
 
 const showCourseSelect = ref(false)
-const selectedCourse = ref<{ id: number; title: string; description: string | null; video_url: string | null; cover_url: string | null } | null>(null)
+const selectedCourse = ref<{
+  id: number
+  title: string
+  description: string | null
+  video_url: string | null
+  cover_url: string | null
+} | null>(null)
 const playingVideo = ref(false)
+const showAudioPlayer = ref(false)
+const audioSrc = ref<string | null>(null)
 
 const 课程data = [
   {
@@ -109,7 +120,13 @@ const startSurvey = () => {
   userAnswers.value = []
   showResult.value = false
 }
-const chooseCourse = (course: { id: number; title: string; description: string | null; video_url: string | null; cover_url: string | null }) => {
+const chooseCourse = (course: {
+  id: number
+  title: string
+  description: string | null
+  video_url: string | null
+  cover_url: string | null
+}) => {
   if (!course.video_url) return
   selectedCourse.value = course
   showCourseSelect.value = false
@@ -135,6 +152,10 @@ const backToBegin = () => {
   selectedCourse.value = null
   playingVideo.value = false
   showSurvey.value = false
+}
+const closeAudio = () => {
+  showAudioPlayer.value = false
+  audioSrc.value = null
 }
 const startChat = () => {
   showBegin.value = false
@@ -255,7 +276,7 @@ onMounted(async () => {
 
   cas.on('ready', () => {
     simulateClick()
-    speakCas('hi~我是抱抱，芳香教室专属助理，请问您是来体验课程、日常巡检还是进行聊天？', {
+    speakCas(spks.welcome, {
       onStart: () => {
         console.log('start')
         simulateClick()
@@ -269,15 +290,15 @@ onMounted(async () => {
 
   cas.on('reply', data => {
     const { content } = data.data
-
     console.log('reply', content)
-    if (content === '好的 我知道了') {
-      // 请问您是否坐好了->没有
+
+    if (content === replys.请问您是否坐好了.否) {
       handleJsx()
     }
 
-    if (content === '好的感谢配合现在请跟随系统指导进行体验课程，现在为您打开芳香机，播放轻缓音乐') {
-      // 请问您是否坐好了->好了
+    if (content === replys.请问您是否坐好了.是) {
+      cas.ask('香薰模式1')
+      playFirstMusic()
     }
   })
 })
@@ -309,6 +330,21 @@ const onTouchEnd = () => {
     })
     .catch(error => console.error('录音停止时出错:', error))
 }
+
+const playFirstMusic = async () => {
+  const headers: Record<string, string> = {}
+  const token = (window as any).token
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  try {
+    const res = await fetch('vite/api/v1/music/', { headers })
+    const data = await res.json()
+    const src = data.data[0].url
+    if (src) {
+      audioSrc.value = src
+      showAudioPlayer.value = true
+    }
+  } catch {}
+}
 </script>
 
 <template>
@@ -320,11 +356,19 @@ const onTouchEnd = () => {
     <div class="right">
       <div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay">
         <div class="begin-modal">
-          <div class="begin-title">hi~我是抱抱，芳香教室专属助理，请问您是来</div>
+          <div class="begin-title">
+            hi~我是抱抱，芳香教室专属助理，请问您是来
+          </div>
           <div class="begin-actions">
-            <button class="btn btn-primary" @click="startSurvey">体验课程</button>
-            <button class="btn btn-secondary" @click="handleInspectionClick">日常巡检</button>
-            <button class="btn btn-secondary" @click="startChat">进行聊天</button>
+            <button class="btn btn-primary" @click="startSurvey">
+              体验课程
+            </button>
+            <button class="btn btn-secondary" @click="handleInspectionClick">
+              日常巡检
+            </button>
+            <button class="btn btn-secondary" @click="startChat">
+              进行聊天
+            </button>
           </div>
         </div>
       </div>
@@ -333,7 +377,9 @@ const onTouchEnd = () => {
         <div class="course-modal">
           <div class="course-modal-header">
             <h2>请选择体验的课程</h2>
-            <button class="btn btn-secondary" @click="backToBegin">返回上一步</button>
+            <button class="btn btn-secondary" @click="backToBegin">
+              返回上一步
+            </button>
           </div>
           <div class="course-list">
             <div
@@ -349,7 +395,9 @@ const onTouchEnd = () => {
               <div class="info">
                 <div class="title">{{ course.title }}</div>
                 <div class="desc">{{ course.description || '暂无描述' }}</div>
-                <div class="tip" v-if="!course.video_url">无视频，暂不可体验</div>
+                <div class="tip" v-if="!course.video_url">
+                  无视频，暂不可体验
+                </div>
               </div>
             </div>
           </div>
@@ -358,7 +406,14 @@ const onTouchEnd = () => {
 
       <div v-if="playingVideo && selectedCourse" class="modal-overlay">
         <div class="video-modal">
-          <button class="video-close" @click="closeVideo" aria-label="关闭视频" title="关闭">×</button>
+          <button
+            class="video-close"
+            @click="closeVideo"
+            aria-label="关闭视频"
+            title="关闭"
+          >
+            ×
+          </button>
           <video
             :key="selectedCourse.id"
             :src="selectedCourse.video_url!"
@@ -373,13 +428,30 @@ const onTouchEnd = () => {
         </div>
       </div>
 
+      <div v-if="showAudioPlayer" class="audio-bar">
+        <button
+          class="modal-close"
+          @click="closeAudio"
+          aria-label="关闭"
+          title="关闭"
+        >
+          ×
+        </button>
+        <audio :src="audioSrc!" controls autoplay></audio>
+      </div>
+
       <div v-if="showSurveyThemeSelect" class="modal-overlay">
         <div class="course-modal">
           <div class="course-modal-header">
             <h2>请选择问卷主题</h2>
           </div>
           <div class="survey-list">
-            <div class="survey-item" v-for="s in surveys" :key="s.id" @click="chooseSurveyTheme(s)">
+            <div
+              class="survey-item"
+              v-for="s in surveys"
+              :key="s.id"
+              @click="chooseSurveyTheme(s)"
+            >
               <div class="survey-title">{{ s.theme || '未命名问卷' }}</div>
             </div>
           </div>
@@ -390,7 +462,9 @@ const onTouchEnd = () => {
         <div class="survey-container">
           <div class="survey-header">
             <h2>问卷答题</h2>
-            <div class="progress">题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</div>
+            <div class="progress">
+              题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
+            </div>
           </div>
 
           <div class="question-card">
@@ -401,19 +475,33 @@ const onTouchEnd = () => {
                 v-for="(option, index) in currentQuestion.options"
                 :key="index"
                 class="option"
-                :class="{ selected: selectedIndex[currentQuestionIndex] === index }"
+                :class="{
+                  selected: selectedIndex[currentQuestionIndex] === index,
+                }"
                 @click="selectAnswer(index, option.value)"
               >
-                <span class="option-label">{{ String.fromCharCode(65 + index) }}</span>
+                <span class="option-label">{{
+                  String.fromCharCode(65 + index)
+                }}</span>
                 <span class="option-text">{{ option.text }}</span>
                 <span class="option-value">{{ option.value }}分</span>
               </div>
             </div>
 
             <div class="navigation">
-              <button class="btn btn-secondary" @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</button>
+              <button
+                class="btn btn-secondary"
+                @click="prevQuestion"
+                :disabled="currentQuestionIndex === 0"
+              >
+                上一题
+              </button>
 
-              <button class="btn btn-primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">
+              <button
+                class="btn btn-primary"
+                @click="nextQuestion"
+                :disabled="selectedIndex[currentQuestionIndex] === undefined"
+              >
                 {{ isLastQuestion ? '提交' : '下一题' }}
               </button>
             </div>
@@ -425,10 +513,14 @@ const onTouchEnd = () => {
         <div class="result-card">
           <div class="result-summary">
             <span class="result-prefix">根据您的情况</span>
-            <span class="grade-badge">{{ getGrade(totalScore)?.label || '' }}</span>
+            <span class="grade-badge">{{
+              getGrade(totalScore)?.label || ''
+            }}</span>
           </div>
           <div class="result-actions">
-            <button class="btn btn-primary" @click="restartSurvey">重新评测</button>
+            <button class="btn btn-primary" @click="restartSurvey">
+              重新评测
+            </button>
             <button class="btn btn-primary" @click="handleJsx">继续</button>
           </div>
         </div>
@@ -450,27 +542,40 @@ const onTouchEnd = () => {
 
 <style scoped>
 #container {
-  width: 500px;
-  height: 500px;
+  width: 100%;
+  height: min(60vh, calc(var(--leftWidth) * 1.1));
 }
 
 .page {
-  display: flex;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: var(--leftWidth) 1fr;
+  gap: clamp(16px, 4vw, 32px);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+  align-items: center;
+  justify-content: center;
+  --leftWidth: 340px;
 }
 
 .left {
-  width: 500px;
-  flex-shrink: 0;
+  width: var(--leftWidth);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .right {
-  flex: 1;
   position: relative;
+  min-width: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(60vh, calc(var(--leftWidth) * 1.1));
 }
 #container {
-  width: 500px;
-  height: 500px;
+  width: 100%;
+  height: min(60vh, calc(var(--leftWidth) * 1.1));
 }
 
 .begin span {
@@ -522,6 +627,10 @@ const onTouchEnd = () => {
   padding: 24px;
   max-width: 900px;
   width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .course-modal-header {
   display: flex;
@@ -535,12 +644,18 @@ const onTouchEnd = () => {
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 12px;
   margin-top: 12px;
+  flex: 1;
+  overflow: auto;
+  padding-right: 6px;
 }
 .survey-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-top: 12px;
+  flex: 1;
+  overflow: auto;
+  padding-right: 6px;
 }
 .survey-item {
   display: flex;
@@ -639,6 +754,48 @@ const onTouchEnd = () => {
 }
 .video-close:active {
   transform: scale(0.98);
+}
+
+.audio-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 12px 16px;
+  z-index: 1100;
+}
+.audio-bar audio {
+  width: clamp(280px, 56vw, 560px);
+}
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  font-size: 22px;
+  line-height: 1;
+  z-index: 2;
+}
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.75);
+  transform: scale(1.05);
+}
+.top-overlay {
+  align-items: flex-start;
+  padding-top: 12px;
 }
 
 /* 答题界面样式 */
@@ -779,7 +936,7 @@ const onTouchEnd = () => {
 
 /* 结果界面样式 */
 .result-container {
-  max-width: 600px;
+  width: clamp(320px, 52vw, 560px);
   margin: 20px auto;
   padding: 20px;
 }
@@ -865,9 +1022,11 @@ const onTouchEnd = () => {
 }
 
 .modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -885,11 +1044,13 @@ const onTouchEnd = () => {
   background: #f8fafc;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
+  flex-wrap: nowrap;
 }
 .result-prefix {
   color: #64748b;
   font-size: 18px;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 .grade-badge {
   display: inline-flex;
@@ -931,6 +1092,32 @@ const onTouchEnd = () => {
   .result-prefix,
   .grade-badge {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 960px) {
+  .page {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    --leftWidth: 300px;
+  }
+  .left {
+    width: var(--leftWidth);
+  }
+  .right {
+    min-width: auto;
+    width: 100%;
+    min-height: auto;
+    align-items: flex-start;
+    padding-top: clamp(24px, 10vh, 80px);
+  }
+  .result-container {
+    width: 92vw;
+  }
+  .modal-overlay {
+    align-items: flex-start;
   }
 }
 </style>
