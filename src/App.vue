@@ -6,7 +6,7 @@ import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
 import { simulateClick } from './utils'
 import { replys, spks } from './config'
-import { apiJson } from '@/utils/request'
+import { apiJson, apiFetch } from '@/utils/request'
 
 const showBegin = ref(false)
 const showSurvey = ref(false)
@@ -156,6 +156,7 @@ const backToBegin = () => {
 }
 const closeAudio = () => {
   showAudioPlayer.value = false
+  if (audioSrc.value && audioSrc.value.startsWith('blob:')) URL.revokeObjectURL(audioSrc.value)
   audioSrc.value = null
 }
 const startChat = () => {
@@ -327,7 +328,21 @@ const onTouchEnd = () => {
 const playFirstMusic = async () => {
   try {
     const data = await apiJson('api/v1/music/')
-    const src = data.data[0].url
+    const list = (data as any)?.data || data
+    const it = Array.isArray(list) ? list[0] : null
+    if (!it) return
+    let src: string | null = it?.music_url || it?.music || it?.url || null
+    if (it?.id) {
+      const res = await apiFetch(`api/v1/music/${it.id}/download`)
+      if (!res.ok) return
+      const blob = await res.blob()
+      src = URL.createObjectURL(blob)
+    } else if (src) {
+      const res = await apiFetch(src)
+      if (!res.ok) return
+      const blob = await res.blob()
+      src = URL.createObjectURL(blob)
+    }
     if (src) {
       audioSrc.value = src
       showAudioPlayer.value = true
@@ -349,15 +364,15 @@ const playFirstMusic = async () => {
             hi~我是抱抱，芳香教室专属助理，请问您是来
           </div>
           <div class="begin-actions">
-            <button class="btn btn-primary" @click="startSurvey">
+            <el-button type="primary" @click="startSurvey">
               体验课程
-            </button>
-            <button class="btn btn-secondary" @click="handleInspectionClick">
+            </el-button>
+            <el-button @click="handleInspectionClick">
               日常巡检
-            </button>
-            <button class="btn btn-secondary" @click="startChat">
+            </el-button>
+            <el-button @click="startChat">
               进行聊天
-            </button>
+            </el-button>
           </div>
         </div>
       </div>
@@ -366,9 +381,9 @@ const playFirstMusic = async () => {
         <div class="course-modal">
           <div class="course-modal-header">
             <h2>请选择体验的课程</h2>
-            <button class="btn btn-secondary" @click="backToBegin">
+            <el-button @click="backToBegin">
               返回上一步
-            </button>
+            </el-button>
           </div>
           <div class="course-list">
             <div
@@ -393,16 +408,16 @@ const playFirstMusic = async () => {
         </div>
       </div>
 
-      <div v-if="playingVideo && selectedCourse" class="modal-overlay">
+      <div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
         <div class="video-modal">
-          <button
+          <el-button
             class="video-close"
             @click="closeVideo"
             aria-label="关闭视频"
             title="关闭"
           >
             ×
-          </button>
+          </el-button>
           <video
             :key="selectedCourse.id"
             :src="selectedCourse.video_url!"
@@ -418,14 +433,14 @@ const playFirstMusic = async () => {
       </div>
 
       <div v-if="showAudioPlayer" class="audio-bar">
-        <button
+        <el-button
           class="modal-close"
           @click="closeAudio"
           aria-label="关闭"
           title="关闭"
         >
           ×
-        </button>
+        </el-button>
         <audio :src="audioSrc!" controls autoplay></audio>
       </div>
 
@@ -478,21 +493,9 @@ const playFirstMusic = async () => {
             </div>
 
             <div class="navigation">
-              <button
-                class="btn btn-secondary"
-                @click="prevQuestion"
-                :disabled="currentQuestionIndex === 0"
-              >
-                上一题
-              </button>
+              <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
 
-              <button
-                class="btn btn-primary"
-                @click="nextQuestion"
-                :disabled="selectedIndex[currentQuestionIndex] === undefined"
-              >
-                {{ isLastQuestion ? '提交' : '下一题' }}
-              </button>
+              <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{ isLastQuestion ? '提交' : '下一题' }}</el-button>
             </div>
           </div>
         </div>
@@ -507,16 +510,16 @@ const playFirstMusic = async () => {
             }}</span>
           </div>
           <div class="result-actions">
-            <button class="btn btn-primary" @click="restartSurvey">
+            <el-button type="primary" @click="restartSurvey">
               重新评测
-            </button>
-            <button class="btn btn-primary" @click="handleJsx">继续</button>
+            </el-button>
+            <el-button type="primary" @click="handleJsx">继续</el-button>
           </div>
         </div>
       </div>
     </div>
   </div>
-  <button
+  <el-button
     class="voice-button"
     @mousedown="onTouchStart"
     @mouseup="onTouchEnd"
@@ -526,7 +529,7 @@ const playFirstMusic = async () => {
     aria-label="按住说话"
   >
     按住说话
-  </button>
+  </el-button>
 </template>
 
 <style scoped>
@@ -600,14 +603,8 @@ const playFirstMusic = async () => {
   flex-wrap: wrap;
 }
 
-.begin-modal .btn {
-  padding: 12px 18px;
-  border-radius: 10px;
-  min-width: 140px;
-}
-.begin-modal .btn-primary {
-  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
-}
+.begin-actions :deep(.el-button) { padding: 12px 18px; border-radius: 10px; min-width: 140px; }
+.begin-actions :deep(.el-button--primary) { box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35); }
 
 .course-modal {
   background: #fff;
@@ -702,14 +699,15 @@ const playFirstMusic = async () => {
   background: #000;
   border-radius: 12px;
   padding: 12px;
-  max-width: 900px;
-  width: 100%;
+  max-width: 1000px;
+  width: 92vw;
   position: relative;
   overflow: hidden;
 }
 .video-modal video {
   width: 100%;
   height: auto;
+  max-height: 80vh;
   border-radius: 8px;
   position: relative;
   z-index: 1;
@@ -886,42 +884,8 @@ const playFirstMusic = async () => {
   margin-top: 20px;
 }
 
-.survey-container .btn {
-  padding: 12px 22px;
-  font-size: 16px;
-}
+.survey-container :deep(.el-button) { padding: 12px 22px; font-size: 16px; }
 
-.btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.btn-secondary {
-  background: #f3f4f6;
-  color: #333;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #e5e7eb;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 /* 结果界面样式 */
 .result-container {

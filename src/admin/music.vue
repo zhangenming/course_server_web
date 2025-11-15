@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { apiJson } from '@/utils/request'
 
 const name = ref('')
@@ -82,6 +83,7 @@ const listLoading = ref(false)
 const listError = ref<string | null>(null)
 const items = ref<any[]>([])
 const playingItem = ref<any | null>(null)
+const audioRef = ref<HTMLAudioElement | null>(null)
 
 const loadList = async () => {
   listLoading.value = true
@@ -102,6 +104,11 @@ const deleteError = ref<string | null>(null)
 
 const deleteItem = async (it: any) => {
   if (!it?.id) return
+  try {
+    await ElMessageBox.confirm('确定删除该音乐？', '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
   deleteLoading.value = it.id
   deleteError.value = null
   try {
@@ -120,9 +127,13 @@ onMounted(() => {
   loadList()
 })
 
-const openAudio = (it: any) => {
-  if (!(it?.music_url || it?.music)) return
+const openAudio = async (it: any) => {
+  if (!it?.url) return
   playingItem.value = it
+  nextTick(() => {
+    audioRef.value?.load()
+    audioRef.value?.play().catch(() => {})
+  })
 }
 const closePlaying = () => {
   playingItem.value = null
@@ -133,7 +144,7 @@ const closePlaying = () => {
   <div class="page">
     <div class="toolbar">
       <h2>音乐管理</h2>
-      <button class="btn btn-primary" @click="openCreate">新增音乐</button>
+      <el-button type="primary" @click="openCreate">新增音乐</el-button>
     </div>
 
     <div class="list-block">
@@ -144,22 +155,20 @@ const closePlaying = () => {
           <div class="card-body">
             <div class="card-title">{{ it.name || '未命名音乐' }}</div>
             <div class="card-meta">ID: {{ it.id }}</div>
-            <div class="card-links">
-              <span class="link" v-if="it.music_url || it.music">{{ it.music_url || it.music }}</span>
-            </div>
+            
           </div>
           <div class="card-actions">
-            <button class="btn btn-primary" :disabled="!(it.music_url || it.music)" @click="openAudio(it)">播放</button>
-            <button class="btn" :disabled="deleteLoading === it.id" @click="deleteItem(it)">删除</button>
+            <el-button type="primary" :disabled="!it.url" @click="openAudio(it)">播放</el-button>
+            <el-button type="danger" :disabled="deleteLoading === it.id" @click="deleteItem(it)">删除</el-button>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="playingItem" class="modal-overlay">
+    <div v-if="playingItem" class="modal-overlay" @click.self="closePlaying">
       <div class="audio-modal">
-        <button class="modal-close" @click="closePlaying" aria-label="关闭" title="关闭">×</button>
-        <audio :src="(playingItem as any).music_url || (playingItem as any).music" controls autoplay></audio>
+        <el-button class="modal-close" circle @click="closePlaying" aria-label="关闭" title="关闭">×</el-button>
+        <audio ref="audioRef" :key="(playingItem as any).url" :src="(playingItem as any).url" controls autoplay preload="auto"></audio>
       </div>
     </div>
 
@@ -191,8 +200,8 @@ const closePlaying = () => {
           </div>
         </div>
         <div class="create-footer">
-          <button class="btn" @click="closeCreate">取消</button>
-          <button class="btn btn-primary" :disabled="!canSubmit() || uploading" @click="submit">上传</button>
+          <el-button @click="closeCreate">取消</el-button>
+          <el-button type="primary" :disabled="!canSubmit() || uploading" @click="submit">上传</el-button>
         </div>
       </div>
     </div>
@@ -212,23 +221,20 @@ const closePlaying = () => {
 .form-control input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15); }
 .file-meta { margin-top: 6px; font-size: 12px; color: #6b7280; }
 label { font-size: 14px; color: #333; margin-bottom: 6px; }
-.btn { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; }
-.btn-primary { background: #3b82f6; color: #fff; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .status { margin-top: 10px; color: #666; }
 .error { margin-top: 10px; color: #ef4444; }
 .list-block { margin-top: 20px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; }
-.card-body { padding: 12px; }
+.card-body { padding: 12px; flex: 1; }
 .card-title { font-weight: 600; color: #111827; }
 .card-meta { margin-top: 4px; font-size: 12px; color: #6b7280; }
 .card-links { margin-top: 8px; font-size: 12px; color: #374151; word-break: break-all; }
-.card-actions { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; }
+.card-actions { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; margin-top: auto; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
 .audio-modal { background: #fff; border-radius: 12px; padding: 12px; max-width: 600px; width: 100%; position: relative; }
 .audio-modal audio { width: 100%; }
-.modal-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2); font-size: 22px; line-height: 1; }
+.modal-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2); font-size: 22px; line-height: 1; z-index: 2; }
 .modal-close:hover { background: rgba(0,0,0,0.75); transform: scale(1.05); }
 .create-modal { background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; max-width: 800px; width: 100%; }
 .create-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }

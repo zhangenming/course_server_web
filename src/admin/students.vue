@@ -129,7 +129,7 @@ const completionPercent = computed(() => {
         <div class="card header">
           <div class="title">学员管理</div>
           <div class="actions">
-            <button class="btn btn-primary" @click="addStudent">新增学员</button>
+            <el-button type="primary" @click="addStudent">新增学员</el-button>
           </div>
         </div>
 
@@ -152,8 +152,8 @@ const completionPercent = computed(() => {
               <input type="text" placeholder="输入ID" v-model="filters.studentId" />
             </div>
             <div class="field actions">
-              <button class="btn btn-primary">查询</button>
-              <button class="btn" @click="resetFilters">重置</button>
+              <el-button type="primary">查询</el-button>
+              <el-button @click="resetFilters">重置</el-button>
             </div>
           </div>
         </div>
@@ -177,16 +177,16 @@ const completionPercent = computed(() => {
               <span>{{ s.doneLessons }}/{{ s.totalLessons }}</span>
               <span>{{ s.registeredAt }}</span>
               <span>
-                <button class="link" @click="selectStudent(s)">查看详情</button>
+                <el-button text @click="selectStudent(s)">查看详情</el-button>
               </span>
             </div>
           </div>
           <div class="table-foot">
             <span>显示 1-{{ pageSize }} 条，共 {{ filtered.length }} 条</span>
             <div class="pager">
-              <button class="btn" disabled>‹</button>
-              <button class="btn btn-primary">{{ page }}</button>
-              <button class="btn" disabled>›</button>
+              <el-button disabled>‹</el-button>
+              <el-button type="primary">{{ page }}</el-button>
+              <el-button disabled>›</el-button>
             </div>
           </div>
         </div>
@@ -201,7 +201,7 @@ const completionPercent = computed(() => {
         <div class="card profile-card" v-if="selected">
           <div class="profile-header">
             <div class="profile-title">{{ selected!.name }}的学员档案</div>
-            <button class="edit-link">编辑</button>
+            <el-button text class="edit-link">编辑</el-button>
           </div>
           <div class="profile-inner">
             <div class="avatar"></div>
@@ -225,9 +225,9 @@ const completionPercent = computed(() => {
         </div>
 
         <div class="card quick-actions">
-          <button class="btn btn-primary">导出报告</button>
-          <button class="btn">查看录像</button>
-          <button class="btn danger">归档记录</button>
+          <el-button type="primary">导出报告</el-button>
+          <el-button>查看录像</el-button>
+          <el-button type="danger">归档记录</el-button>
         </div>
       </aside>
     </div>
@@ -242,9 +242,6 @@ const completionPercent = computed(() => {
 .header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; }
 .title { font-weight: 700; color: #111827; }
 .actions { display: flex; gap: 8px; }
-.btn { height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f3f4f6; cursor: pointer; }
-.btn-primary { height: 36px; background: var(--primary, #8b5cf6); color: #fff; border-color: var(--primary-hover, #7c3aed); }
-.btn.danger { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
 
 .filters { padding: 16px 18px; }
 .filters-grid { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(200px, 1fr) minmax(200px, 1fr) auto; column-gap: 16px; row-gap: 12px; align-items: end; }

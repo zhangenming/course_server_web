@@ -42,7 +42,7 @@ const formRef = ref<any>(null)
   <div class="page">
     <div class="toolbar">
       <h2>问卷管理</h2>
-      <button class="btn btn-primary" @click="openAdd">新增问卷</button>
+      <el-button type="primary" @click="openAdd">新增问卷</el-button>
     </div>
     <div class="list">
       <div v-if="loading" class="status">正在加载…</div>
@@ -60,7 +60,7 @@ const formRef = ref<any>(null)
       <div class="modal-card">
         <div class="modal-header">
           <div class="modal-title">新增问卷</div>
-          <button class="modal-close" @click="closeAdd">×</button>
+          <el-button class="modal-close" circle @click="closeAdd">×</el-button>
         </div>
         <div class="modal-body">
           <SurveysAdd
@@ -74,9 +74,9 @@ const formRef = ref<any>(null)
           />
         </div>
         <div class="modal-footer">
-          <button class="btn btn-primary" @click="formRef?.createSurvey?.()">
+          <el-button type="primary" @click="formRef?.createSurvey?.()">
             创建问卷
-          </button>
+          </el-button>
         </div>
       </div>
     </div>

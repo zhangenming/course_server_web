@@ -106,7 +106,7 @@ onMounted(() => {
   <div class="page">
     <div class="toolbar">
       <h2>课程管理</h2>
-      <button class="btn btn-primary" @click="openCreate">新建课程</button>
+      <el-button type="primary" @click="openCreate">新建课程</el-button>
     </div>
 
     <div class="list-block">
@@ -160,7 +160,7 @@ onMounted(() => {
                   >
                     <div class="vi-title">{{ v.name || '未命名视频' }}</div>
                     <div class="vi-meta">ID: {{ v.id }}</div>
-                    <button class="btn" @click="!selectedVideoIds.includes(v.id) && selectedVideoIds.push(v.id)">添加</button>
+                    <el-button @click="!selectedVideoIds.includes(v.id) && selectedVideoIds.push(v.id)">添加</el-button>
                   </div>
                 </div>
               </div>
@@ -171,7 +171,7 @@ onMounted(() => {
                   <div class="selected-item" v-for="sid in selectedVideoIds" :key="sid">
                     <div class="vi-title">{{ (allVideos.find(x => x.id === sid) || {}).name || '视频 ' + sid }}</div>
                     <div class="vi-meta">ID: {{ sid }}</div>
-                    <button class="btn" @click="removeSelected(sid)">移除</button>
+                    <el-button @click="removeSelected(sid)">移除</el-button>
                   </div>
                 </div>
               </div>
@@ -181,8 +181,8 @@ onMounted(() => {
           </div>
         </div>
         <div class="create-footer">
-          <button class="btn" @click="closeCreate">取消</button>
-          <button class="btn btn-primary" :disabled="!canSubmit() || submitting" @click="submit">创建</button>
+          <el-button @click="closeCreate">取消</el-button>
+          <el-button type="primary" :disabled="!canSubmit() || submitting" @click="submit">创建</el-button>
         </div>
       </div>
     </div>
@@ -224,12 +224,8 @@ onMounted(() => {
 .vi-meta { font-size: 12px; color: #6b7280; }
 .selected-panel { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 12px; }
 
-.btn { padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f3f4f6; cursor: pointer; }
-.btn-primary { background: #3b82f6; color: #fff; border-color: #2563eb; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
 
 <script lang="ts">
 export default {}
 </script>
-

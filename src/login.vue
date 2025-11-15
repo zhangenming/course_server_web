@@ -62,7 +62,7 @@ const submit = async () => {
         <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="请输入密码" @keyup.enter="submit" />
       </div>
       <div class="actions">
-        <button class="btn btn-primary" :disabled="loading" @click="submit">登录</button>
+        <el-button type="primary" :disabled="loading" @click="submit">登录</el-button>
       </div>
     </div>
   </div>
@@ -138,23 +138,7 @@ input {
   margin-top: 16px;
   display: flex;
 }
-.actions .btn {
-  width: 100%;
-}
-.btn {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.btn-primary {
-  background: #3b82f6;
-  color: #fff;
-}
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.actions .el-button { width: 100%; }
 .error {
   margin-top: 10px;
   color: #ef4444;

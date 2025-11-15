@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
-import { apiJson } from '@/utils/request'
+import { apiJson, apiFetch } from '@/utils/request'
+import { ElMessageBox } from 'element-plus'
 
 const name = ref('')
 const file = ref<File | null>(null)
@@ -46,7 +47,7 @@ const submit = async () => {
   fd.append('name', name.value)
   fd.append('video', file.value as File)
   try {
-    const data = await apiJson('/api/v1/videos/upload', {
+    const data = await apiJson('api/v1/videos/upload', {
       method: 'POST',
       body: fd,
     })
@@ -86,7 +87,7 @@ const loadList = async () => {
   listError.value = null
   items.value = []
   try {
-    const data = await apiJson('/api/v1/videos/')
+    const data = await apiJson('api/v1/videos/')
     items.value = data?.data || data
   } catch (e: any) {
     listError.value = e?.message || '网络错误'
@@ -106,13 +107,63 @@ const openVideo = (it: any) => {
 const closePlaying = () => {
   playingItem.value = null
 }
+
+const downloadingId = ref<number | null>(null)
+const downloadError = ref<string | null>(null)
+const downloadVideo = async (it: any) => {
+  if (!it?.id) return
+  downloadingId.value = it.id
+  downloadError.value = null
+  try {
+    const res = await apiFetch(`api/v1/videos/${it.id}/download`)
+    if (!res.ok) throw new Error(`请求失败(${res.status})`)
+    const blob = await res.blob()
+    const cd = res.headers.get('Content-Disposition') || ''
+    let filename = ''
+    const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i)
+    filename = decodeURIComponent(m?.[1] || m?.[2] || `video_${it.id}.mp4`)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    downloadError.value = e?.message || '下载失败'
+  } finally {
+    downloadingId.value = null
+  }
+}
+
+const deleteLoading = ref<number | null>(null)
+const deleteError = ref<string | null>(null)
+const deleteVideo = async (it: any) => {
+  if (!it?.id) return
+  try {
+    await ElMessageBox.confirm('确定删除该视频？', '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
+  deleteLoading.value = it.id
+  deleteError.value = null
+  try {
+    await apiJson(`api/v1/videos/${it.id}`, { method: 'DELETE' })
+    await loadList()
+  } catch (e: any) {
+    deleteError.value = e?.message || '删除失败'
+  } finally {
+    deleteLoading.value = null
+  }
+}
 </script>
 
 <template>
   <div class="page">
     <div class="toolbar">
       <h2>视频管理</h2>
-      <button class="btn btn-primary" @click="openCreate">新增视频</button>
+      <el-button type="primary" @click="openCreate">新增视频</el-button>
     </div>
 
     <div class="list-block">
@@ -120,26 +171,27 @@ const closePlaying = () => {
       <div v-if="listError" class="error">{{ listError }}</div>
       <div v-if="items.length" class="cards">
         <div class="card" v-for="it in items" :key="it.id">
-          <div class="card-cover" v-if="it.cover_url || it.cover">
-            <img :src="it.cover_url || it.cover" alt="cover" />
+          <div class="card-cover">
+            <img v-if="it.cover_url || it.cover" :src="it.cover_url || it.cover" alt="cover" />
+            <div v-else class="cover-placeholder">无封面</div>
           </div>
           <div class="card-body">
             <div class="card-title">{{ it.name || '未命名视频' }}</div>
             <div class="card-meta">ID: {{ it.id }}</div>
-            <div class="card-links">
-              <span class="link" v-if="it.video_url || it.video">{{ it.video_url || it.video }}</span>
-            </div>
           </div>
           <div class="card-actions">
-            <button class="btn btn-primary" :disabled="!(it.video_url || it.video)" @click="openVideo(it)">播放</button>
+            <el-button type="primary" :disabled="!(it.video_url || it.video)" @click="openVideo(it)">播放</el-button>
+            <el-button :disabled="downloadingId === it.id" @click="downloadVideo(it)">下载</el-button>
+            <el-button type="danger" :disabled="deleteLoading === it.id" @click="deleteVideo(it)">删除</el-button>
           </div>
-        </div>
       </div>
     </div>
+    </div>
+  </div>
 
-    <div v-if="playingItem" class="modal-overlay">
+    <div v-if="playingItem" class="modal-overlay" @click.self="closePlaying">
       <div class="video-modal">
-        <button class="video-close" @click="closePlaying" aria-label="关闭视频" title="关闭">×</button>
+        <el-button class="video-close" circle @click="closePlaying" aria-label="关闭视频" title="关闭">×</el-button>
         <video
           :src="(playingItem as any).video_url || (playingItem as any).video"
           :poster="(playingItem as any).cover_url || (playingItem as any).cover"
@@ -177,12 +229,13 @@ const closePlaying = () => {
           </div>
         </div>
         <div class="create-footer">
-          <button class="btn" @click="closeCreate">取消</button>
-          <button class="btn btn-primary" :disabled="!canSubmit() || uploading" @click="submit">上传</button>
+          <el-button @click="closeCreate">取消</el-button>
+          <el-button type="primary" :disabled="!canSubmit() || uploading" @click="submit">上传</el-button>
         </div>
       </div>
     </div>
-  </div>
+    <div v-if="downloadError" class="error">{{ downloadError }}</div>
+    <div v-if="deleteError" class="error">{{ deleteError }}</div>
 </template>
 
 <style scoped>
@@ -252,20 +305,6 @@ input[type='file'] {
 .actions {
   margin-top: 10px;
 }
-.btn {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.btn-primary {
-  background: #3b82f6;
-  color: #fff;
-}
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 .status {
   margin-top: 10px;
   color: #666;
@@ -281,47 +320,25 @@ input[type='file'] {
 .list-block {
   margin-top: 20px;
 }
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  display: flex;
-  flex-direction: column;
-}
-.card-cover img {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-}
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #d1d5db; }
+.card-cover { height: 160px; background: #f5f7fa; display: flex; align-items: center; justify-content: center; }
+.card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-placeholder { color: #9ca3af; font-size: 12px; }
 .card-body {
   padding: 12px;
+  flex: 1;
 }
-.card-title {
-  font-weight: 600;
-  color: #111827;
-}
+.card-actions { display: flex; margin-top: auto; }
+.card-title { font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-meta {
   margin-top: 4px;
   font-size: 12px;
   color: #6b7280;
 }
-.card-links {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #374151;
-  word-break: break-all;
-}
-.card-actions {
-  padding: 12px;
-  border-top: 1px solid #e5e7eb;
-}
+.card-links { margin-top: 8px; font-size: 12px; color: #6b7280; word-break: break-all; }
+.card-actions { padding: 12px; border-top: 1px solid #e5e7eb; }
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -336,14 +353,15 @@ input[type='file'] {
   background: #000;
   border-radius: 12px;
   padding: 12px;
-  max-width: 900px;
-  width: 100%;
+  max-width: 1000px;
+  width: 92vw;
   position: relative;
   overflow: hidden;
 }
 .video-modal video {
   width: 100%;
   height: auto;
+  max-height: 80vh;
   border-radius: 8px;
   position: relative;
   z-index: 1;
