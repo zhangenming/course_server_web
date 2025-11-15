@@ -116,7 +116,6 @@ onMounted(() => {
         <div class="card" v-for="it in items" :key="it.id">
           <div class="card-body">
             <div class="card-title">{{ it.title || '未命名课程' }}</div>
-            <div class="card-meta">ID: {{ it.id }}</div>
             <div class="card-desc">{{ it.description || '暂无描述' }}</div>
             <div class="card-meta">视频数：{{ Array.isArray(it.video_ids) ? it.video_ids.length : (it.videos?.length || 0) }}</div>
           </div>
@@ -159,7 +158,6 @@ onMounted(() => {
                     @dragstart="onDragStartVideo(v.id)"
                   >
                     <div class="vi-title">{{ v.name || '未命名视频' }}</div>
-                    <div class="vi-meta">ID: {{ v.id }}</div>
                     <el-button @click="!selectedVideoIds.includes(v.id) && selectedVideoIds.push(v.id)">添加</el-button>
                   </div>
                 </div>
@@ -170,7 +168,6 @@ onMounted(() => {
                 <div class="panel-list">
                   <div class="selected-item" v-for="sid in selectedVideoIds" :key="sid">
                     <div class="vi-title">{{ (allVideos.find(x => x.id === sid) || {}).name || '视频 ' + sid }}</div>
-                    <div class="vi-meta">ID: {{ sid }}</div>
                     <el-button @click="removeSelected(sid)">移除</el-button>
                   </div>
                 </div>

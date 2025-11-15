@@ -2,6 +2,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { apiJson, apiFetch } from '@/utils/request'
 import { ElMessageBox } from 'element-plus'
+import { bytesToSize } from '@/utils'
 
 const name = ref('')
 const file = ref<File | null>(null)
@@ -30,12 +31,6 @@ const canSubmit = () => {
   return !!name.value && !!file.value && !uploading.value
 }
 
-const bytesToSize = (bytes: number) => {
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  if (bytes === 0) return '0 B'
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
-}
 const showCreate = ref(false)
 
 const submit = async () => {
@@ -177,7 +172,6 @@ const deleteVideo = async (it: any) => {
           </div>
           <div class="card-body">
             <div class="card-title">{{ it.name || '未命名视频' }}</div>
-            <div class="card-meta">ID: {{ it.id }}</div>
           </div>
           <div class="card-actions">
             <el-button type="primary" :disabled="!(it.video_url || it.video)" @click="openVideo(it)">播放</el-button>

@@ -50,7 +50,6 @@ const formRef = ref<any>(null)
       <div v-if="items.length" class="cards">
         <div class="card" v-for="it in items" :key="it.id">
           <div class="title">{{ it.theme || '未命名问卷' }}</div>
-          <div class="meta">ID: {{ it.id }}</div>
         </div>
       </div>
       <div v-else-if="!loading && !error" class="empty">暂无问卷</div>

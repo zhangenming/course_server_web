@@ -2,6 +2,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { apiJson } from '@/utils/request'
+import { bytesToSize } from '@/utils'
 
 const name = ref('')
 const file = ref<File | null>(null)
@@ -32,12 +33,6 @@ const canSubmit = () => {
   return !!name.value && !!file.value && !uploading.value
 }
 
-const bytesToSize = (bytes: number) => {
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  if (bytes === 0) return '0 B'
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`
-}
 const showCreate = ref(false)
 
 const submit = async () => {
@@ -154,7 +149,6 @@ const closePlaying = () => {
         <div class="card" v-for="it in items" :key="it.id">
           <div class="card-body">
             <div class="card-title">{{ it.name || '未命名音乐' }}</div>
-            <div class="card-meta">ID: {{ it.id }}</div>
             
           </div>
           <div class="card-actions">

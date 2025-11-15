@@ -15,8 +15,7 @@ type Student = {
 const filters = ref({
   from: '',
   to: '',
-  employeeNo: '',
-  studentId: '',
+  name: '',
 })
 
 const students = ref<Student[]>([
@@ -32,8 +31,11 @@ const pageSize = ref(5)
 
 const filtered = computed(() => {
   let list = students.value
-  if (filters.value.studentId) list = list.filter(s => s.id.includes(filters.value.studentId))
-  if (filters.value.employeeNo) list = list.filter(s => s.name.includes(filters.value.employeeNo))
+  if (filters.value.name) list = list.filter(s => s.name.includes(filters.value.name))
+  const from = filters.value.from ? new Date(filters.value.from).getTime() : NaN
+  const to = filters.value.to ? new Date(filters.value.to).getTime() : NaN
+  if (!Number.isNaN(from)) list = list.filter(s => new Date(s.registeredAt).getTime() >= from)
+  if (!Number.isNaN(to)) list = list.filter(s => new Date(s.registeredAt).getTime() <= to)
   return list
 })
 
@@ -48,7 +50,7 @@ const selectStudent = (s: Student) => {
 }
 
 const resetFilters = () => {
-  filters.value = { from: '', to: '', employeeNo: '', studentId: '' }
+  filters.value = { from: '', to: '', name: '' }
 }
 
 const addStudent = () => {}
@@ -144,12 +146,8 @@ const completionPercent = computed(() => {
               </div>
             </div>
             <div class="field">
-              <label>学员工号</label>
-              <input type="text" placeholder="输入工号" v-model="filters.employeeNo" />
-            </div>
-            <div class="field">
-              <label>学员ID</label>
-              <input type="text" placeholder="输入ID" v-model="filters.studentId" />
+              <label>学员姓名</label>
+              <input type="text" placeholder="输入姓名" v-model="filters.name" />
             </div>
             <div class="field actions">
               <el-button type="primary">查询</el-button>
@@ -160,7 +158,6 @@ const completionPercent = computed(() => {
 
         <div class="card table">
           <div class="table-head">
-            <span>学员ID</span>
             <span>学员姓名</span>
             <span>状态</span>
             <span>课程次数</span>
@@ -169,7 +166,6 @@ const completionPercent = computed(() => {
           </div>
           <div class="table-rows">
             <div class="row" v-for="s in paged" :key="s.id">
-              <span>{{ s.id }}</span>
               <span>{{ s.name }}</span>
               <span>
                 <span class="badge" :class="s.status">{{ s.status }}</span>
@@ -205,14 +201,13 @@ const completionPercent = computed(() => {
           </div>
           <div class="profile-inner">
             <div class="avatar"></div>
-            <div class="profile-table">
-              <div class="profile-row"><span class="label">学员ID</span><span class="value">{{ selected!.id }}</span></div>
-              <div class="profile-row"><span class="label">姓名</span><span class="value">{{ selected!.name }}</span></div>
-              <div class="profile-row"><span class="label">当前状态</span><span class="value">{{ selected!.status }}</span></div>
-              <div class="profile-row"><span class="label">注册日期</span><span class="value">{{ selected!.registeredAt }}</span></div>
-              <div class="profile-row"><span class="label">已完成课程</span><span class="value">{{ selected!.doneLessons }}节 ({{ completionPercent }}%)</span></div>
-            </div>
+          <div class="profile-table">
+            <div class="profile-row"><span class="label">姓名</span><span class="value">{{ selected!.name }}</span></div>
+            <div class="profile-row"><span class="label">当前状态</span><span class="value">{{ selected!.status }}</span></div>
+            <div class="profile-row"><span class="label">注册日期</span><span class="value">{{ selected!.registeredAt }}</span></div>
+            <div class="profile-row"><span class="label">已完成课程</span><span class="value">{{ selected!.doneLessons }}节 ({{ completionPercent }}%)</span></div>
           </div>
+        </div>
         </div>
 
         <div class="card metrics-card">
@@ -244,7 +239,7 @@ const completionPercent = computed(() => {
 .actions { display: flex; gap: 8px; }
 
 .filters { padding: 16px 18px; }
-.filters-grid { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(200px, 1fr) minmax(200px, 1fr) auto; column-gap: 16px; row-gap: 12px; align-items: end; }
+.filters-grid { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(200px, 1fr) auto; column-gap: 16px; row-gap: 12px; align-items: end; }
 .field { display: flex; flex-direction: column; gap: 8px; }
 .field.actions { flex-direction: row; justify-content: flex-end; align-items: center; gap: 8px; }
 .field label { color: #374151; font-size: 13px; }
@@ -254,8 +249,8 @@ input[type='text'] { height: 36px; padding: 0 12px; border: 1px solid #e5e7eb; b
 .row :deep(.el-date-editor) { width: 100%; height: 36px; }
 
 .table { padding: 10px 0; overflow: hidden; }
-.table-head { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 100px; padding: 10px 16px; border-bottom: 1px solid #eef2f7; color: #6b7280; }
-.table-rows .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 100px; padding: 12px 16px; align-items: center; border-bottom: 1px dashed #eef2f7; }
+.table-head { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 100px; padding: 10px 16px; border-bottom: 1px solid #eef2f7; color: #6b7280; }
+.table-rows .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 100px; padding: 12px 16px; align-items: center; border-bottom: 1px dashed #eef2f7; }
 .badge { padding: 4px 8px; border-radius: 9999px; font-size: 12px; }
 .badge.完成课程 { background: #dcfce7; color: #166534; }
 .badge.课程中 { background: #fef3c7; color: #92400e; }
