@@ -5,12 +5,12 @@ import * as echarts from 'echarts'
 import { apiJson } from '@/utils/request'
 
 type Student = {
-  id: string
-  name: string
-  status: '完成课程' | '课程中' | '未完成'
-  doneLessons: number
-  totalLessons: number
-  registeredAt: string
+  user_id: number
+  username: string
+  name: string | null
+  status: string
+  total_courses: number | null
+  learn_times: number | null
 }
 
 const filters = ref({
@@ -19,24 +19,30 @@ const filters = ref({
   name: '',
 })
 
-const students = ref<Student[]>([
-  { id: 'S20210801', name: '张雨薇', status: '完成课程', doneLessons: 8, totalLessons: 12, registeredAt: '2023-05-12' },
-  { id: 'S20210902', name: '李华', status: '课程中', doneLessons: 3, totalLessons: 12, registeredAt: '2023-06-18' },
-  { id: 'S20211003', name: '王佳明', status: '完成课程', doneLessons: 12, totalLessons: 12, registeredAt: '2023-03-25' },
-  { id: 'S20211104', name: '陈思琪', status: '未完成', doneLessons: 5, totalLessons: 12, registeredAt: '2023-07-02' },
-  { id: 'S20211205', name: '赵丽娜', status: '课程中', doneLessons: 9, totalLessons: 12, registeredAt: '2023-04-15' },
-])
+const students = ref<Student[]>([])
+const listLoading = ref(false)
+const listError = ref<string | null>(null)
+const loadCourseStatus = async () => {
+  listLoading.value = true
+  listError.value = null
+  students.value = []
+  try {
+    const data = await apiJson('api/v1/users/course_status')
+    students.value = Array.isArray(data) ? (data as any) : []
+  } catch (e: any) {
+    listError.value = e?.message || '网络错误'
+  } finally {
+    listLoading.value = false
+  }
+}
 
 const page = ref(1)
 const pageSize = ref(5)
 
 const filtered = computed(() => {
   let list = students.value
-  if (filters.value.name) list = list.filter(s => s.name.includes(filters.value.name))
-  const from = filters.value.from ? new Date(filters.value.from).getTime() : NaN
-  const to = filters.value.to ? new Date(filters.value.to).getTime() : NaN
-  if (!Number.isNaN(from)) list = list.filter(s => new Date(s.registeredAt).getTime() >= from)
-  if (!Number.isNaN(to)) list = list.filter(s => new Date(s.registeredAt).getTime() <= to)
+  const q = String(filters.value.name || '').trim().toLowerCase()
+  if (q) list = list.filter(s => String(s.name || s.username || '').toLowerCase().includes(q))
   return list
 })
 
@@ -45,7 +51,7 @@ const paged = computed(() => {
   return filtered.value.slice(start, start + pageSize.value)
 })
 
-const selected = ref<Student | null>(students.value[0])
+const selected = ref<Student | null>(null)
 const selectStudent = (s: Student) => {
   selected.value = s
 }
@@ -151,6 +157,7 @@ onMounted(() => {
   initChart()
   window.addEventListener('resize', resize)
   loadMe()
+  loadCourseStatus()
 })
 
 onBeforeUnmount(() => {
@@ -159,10 +166,7 @@ onBeforeUnmount(() => {
   chart = null
 })
 
-const completionPercent = computed(() => {
-  if (!selected.value) return 0
-  return Math.round((selected.value.doneLessons / selected.value.totalLessons) * 100)
-})
+const completionPercent = computed(() => 0)
 
 const me = ref<any | null>(null)
 const loadMe = async () => {
@@ -190,6 +194,11 @@ const fmtDate = (s: string) => {
   } catch {
     return s
   }
+}
+const statusLabel = (s: string) => {
+  if (s === 'finished') return '完成课程'
+  if (s === 'ongoing') return '课程中'
+  return '未完成'
 }
 </script>
 
@@ -229,21 +238,17 @@ const fmtDate = (s: string) => {
           <div class="table-head">
             <span>学员姓名</span>
             <span>状态</span>
-            <span>课程次数</span>
-            <span>注册日期</span>
-            <span>操作</span>
+            <span>总课程数</span>
+            <span>学习次数</span>
           </div>
           <div class="table-rows">
-            <div class="row" v-for="s in paged" :key="s.id">
-              <span>{{ s.name }}</span>
+            <div class="row" v-for="s in paged" :key="s.user_id">
+              <span>{{ s.name || s.username }}</span>
               <span>
-                <span class="badge" :class="s.status">{{ s.status }}</span>
+                <span class="badge" :class="statusLabel(s.status)">{{ statusLabel(s.status) }}</span>
               </span>
-              <span>{{ s.doneLessons }}/{{ s.totalLessons }}</span>
-              <span>{{ s.registeredAt }}</span>
-              <span>
-                <el-button text @click="selectStudent(s)">查看详情</el-button>
-              </span>
+              <span>{{ s.total_courses ?? 0 }}</span>
+              <span>{{ s.learn_times ?? 0 }}</span>
             </div>
           </div>
           <div class="table-foot">
@@ -273,18 +278,8 @@ const fmtDate = (s: string) => {
             <div class="profile-row"><span class="label">姓名</span><span class="value">{{ (me as any).name ?? '—' }}</span></div>
             <div class="profile-row"><span class="label">当前状态</span><span class="value">{{ (me as any).learning_status ?? '—' }}</span></div>
             <div class="profile-row"><span class="label">注册日期</span><span class="value">{{ fmtDate((me as any).registered_at) }}</span></div>
-            <div class="profile-row"><span class="label">已完成课程</span><span class="value">{{ (me as any).completed_courses ?? 0 }}节 ({{ meCompletionPercent }}%)</span></div>
           </div>
         </div>
-        </div>
-
-        <div class="card metrics-card">
-          <div class="section-title">最新测评结果</div>
-          <div class="metric" v-for="m in metrics" :key="m.label">
-            <span class="label">{{ m.label }}</span>
-            <div class="bar-wrap"><div class="bar" :style="{ width: (m.value/10*100) + '%', background: m.color }"></div></div>
-            <span class="value">{{ m.value }}/10</span>
-          </div>
         </div>
 
         <div class="card quick-actions">
@@ -356,8 +351,8 @@ input[type='text'] { height: 36px; padding: 0 12px; border: 1px solid #e5e7eb; b
 .row :deep(.el-date-editor) { width: 100%; height: 36px; }
 
 .table { padding: 10px 0; overflow: hidden; }
-.table-head { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 100px; padding: 10px 16px; border-bottom: 1px solid #eef2f7; color: #6b7280; }
-.table-rows .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 100px; padding: 12px 16px; align-items: center; border-bottom: 1px dashed #eef2f7; }
+.table-head { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; padding: 10px 16px; border-bottom: 1px solid #eef2f7; color: #6b7280; }
+.table-rows .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; padding: 12px 16px; align-items: center; border-bottom: 1px dashed #eef2f7; }
 .badge { padding: 4px 8px; border-radius: 9999px; font-size: 12px; }
 .badge.完成课程 { background: #dcfce7; color: #166534; }
 .badge.课程中 { background: #fef3c7; color: #92400e; }

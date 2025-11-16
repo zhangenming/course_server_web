@@ -7,12 +7,11 @@ import Students from './students.vue'
 import Courses from './courses.vue'
 import Users from './users.vue'
 import UsersQuestionnaires from './users-questionnaires.vue'
-import UsersCourseStatus from './users-course-status.vue'
 import LearningRecords from './learning-records.vue'
 import SurveyRecords from './survey-records.vue'
 import ExportPage from './export.vue'
 
-const active = ref<'students' | 'videos' | 'music' | 'courses' | 'surveysList' | 'users' | 'usersQuestionnaires' | 'usersCourseStatus' | 'learningRecords' | 'surveyRecords' | 'export'>(
+const active = ref<'students' | 'videos' | 'music' | 'courses' | 'surveysList' | 'users' | 'usersQuestionnaires' | 'learningRecords' | 'surveyRecords' | 'export'>(
   'students'
 )
 const onSelect = (key: string) => {
@@ -29,64 +28,6 @@ const onSelect = (key: string) => {
       <aside class="sidebar">
         <div class="brand">后台管理</div>
         <el-menu class="sidebar-menu" :default-active="active" @select="onSelect">
-          <el-menu-item index="export">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M12 5v10" />
-                <path d="M7 10l5-5 5 5" />
-                <path d="M4 19h16" />
-              </svg>
-            </span>
-            <span class="label">数据导出</span>
-          </el-menu-item>
-          <el-menu-item index="surveyRecords">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 6h16" />
-                <path d="M4 12h16" />
-                <path d="M4 18h16" />
-              </svg>
-            </span>
-            <span class="label">问卷记录</span>
-          </el-menu-item>
-          <el-menu-item index="learningRecords">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 6h16" />
-                <path d="M4 12h16" />
-                <path d="M4 18h16" />
-              </svg>
-            </span>
-            <span class="label">学习记录</span>
-          </el-menu-item>
-          <el-menu-item index="usersCourseStatus">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 7l8-3 8 3-8 3-8-3" />
-                <path d="M4 12l8 3 8-3" />
-              </svg>
-            </span>
-            <span class="label">学籍课程状态</span>
-          </el-menu-item>
-          <el-menu-item index="usersQuestionnaires">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 6h16" />
-                <path d="M4 12h16" />
-                <path d="M4 18h16" />
-              </svg>
-            </span>
-            <span class="label">用户问卷调查</span>
-          </el-menu-item>
-          <el-menu-item index="users">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M5.121 17.804A7 7 0 0112 15a7 7 0 016.879 2.804" />
-                <path d="M12 12a4 4 0 100-8 4 4 0 000 8" />
-              </svg>
-            </span>
-            <span class="label">用户管理</span>
-          </el-menu-item>
           <el-menu-item index="students">
             <span class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
@@ -96,15 +37,15 @@ const onSelect = (key: string) => {
             </span>
             <span class="label">学员管理</span>
           </el-menu-item>
-          <el-menu-item index="surveysList">
+          <el-menu-item index="users">
             <span class="icon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <path d="M4 6h16" />
-                <path d="M4 12h16" />
-                <path d="M4 18h16" />
+                <circle cx="9" cy="8" r="3" />
+                <circle cx="15" cy="12" r="3" />
+                <path d="M3 20c2-4 6-6 10-6" />
               </svg>
             </span>
-            <span class="label">问卷管理</span>
+            <span class="label">用户管理</span>
           </el-menu-item>
           <el-menu-item index="courses">
             <span class="icon" aria-hidden="true">
@@ -136,6 +77,55 @@ const onSelect = (key: string) => {
             </span>
             <span class="label">音乐管理</span>
           </el-menu-item>
+          <el-menu-item index="surveysList">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 6h16" />
+                <path d="M4 12h16" />
+                <path d="M4 18h16" />
+              </svg>
+            </span>
+            <span class="label">问卷管理</span>
+          </el-menu-item>
+          <el-menu-item index="surveyRecords">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="6" y="5" width="12" height="15" rx="2" />
+                <path d="M9 9h6" />
+                <path d="M9 13h6" />
+              </svg>
+            </span>
+            <span class="label">问卷记录</span>
+          </el-menu-item>
+          <el-menu-item index="learningRecords">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 3" />
+              </svg>
+            </span>
+            <span class="label">学习记录</span>
+          </el-menu-item>
+          <el-menu-item index="usersQuestionnaires">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 6h16" />
+                <path d="M4 12h16" />
+                <path d="M4 18h16" />
+              </svg>
+            </span>
+            <span class="label">用户问卷调查</span>
+          </el-menu-item>
+          <el-menu-item index="export">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 19V9" />
+                <path d="M7 14l5 5 5-5" />
+                <path d="M4 5h16" />
+              </svg>
+            </span>
+            <span class="label">数据导出</span>
+          </el-menu-item>
         </el-menu>
       </aside>
       <main class="content">
@@ -143,7 +133,6 @@ const onSelect = (key: string) => {
         <ExportPage v-else-if="active === 'export'" />
         <SurveyRecords v-else-if="active === 'surveyRecords'" />
         <LearningRecords v-else-if="active === 'learningRecords'" />
-        <UsersCourseStatus v-else-if="active === 'usersCourseStatus'" />
         <UsersQuestionnaires v-else-if="active === 'usersQuestionnaires'" />
         <Users v-else-if="active === 'users'" />
         <SurveysList v-else-if="active === 'surveysList'" />
