@@ -107,8 +107,9 @@ const metrics = ref([
   { label: '专注力提升', value: 6.7, color: '#6366f1' },
 ])
 
-const last7Days = ref<number[]>([88, 66, 94, 58, 72, 83, 95])
-const line7Days = ref<number[]>([6, 7, 5, 4, 5, 6, 7])
+const statsDates = ref<string[]>([])
+const statsLearning = ref<number[]>([])
+const statsSurvey = ref<number[]>([])
 
 const chartRef = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
@@ -119,7 +120,7 @@ const initChart = () => {
     grid: { left: 24, right: 24, top: 16, bottom: 24 },
     xAxis: {
       type: 'category',
-      data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+      data: statsDates.value.length ? statsDates.value : [],
       axisLine: { lineStyle: { color: '#e5e7eb' } },
       axisTick: { show: false },
       axisLabel: { color: '#6b7280' },
@@ -133,13 +134,13 @@ const initChart = () => {
     series: [
       {
         type: 'bar',
-        data: last7Days.value,
+        data: statsLearning.value,
         itemStyle: { color: '#8b5cf6' },
         barWidth: '40%',
       },
       {
         type: 'line',
-        data: line7Days.value,
+        data: statsSurvey.value,
         smooth: true,
         symbol: 'circle',
         symbolSize: 6,
@@ -157,6 +158,7 @@ onMounted(() => {
   initChart()
   window.addEventListener('resize', resize)
   loadMe()
+  loadStats()
   loadCourseStatus()
 })
 
@@ -194,6 +196,24 @@ const fmtDate = (s: string) => {
   } catch {
     return s
   }
+}
+const loadStats = async () => {
+  try {
+    const data = await apiJson('api/v1/records/stats/report')
+    const arr = Array.isArray(data) ? (data as any) : (data ? [data as any] : [])
+    statsDates.value = arr.map((x: any) => String(x.date || ''))
+    statsLearning.value = arr.map((x: any) => Number(x.learning_count || 0))
+    statsSurvey.value = arr.map((x: any) => Number(x.survey_count || 0))
+    if (chart) {
+      chart.setOption({
+        xAxis: { data: statsDates.value },
+        series: [
+          { type: 'bar', data: statsLearning.value, itemStyle: { color: '#8b5cf6' }, barWidth: '40%' },
+          { type: 'line', data: statsSurvey.value, smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' } },
+        ],
+      })
+    }
+  } catch {}
 }
 const statusLabel = (s: string) => {
   if (s === 'finished') return '完成课程'
@@ -233,6 +253,9 @@ const statusLabel = (s: string) => {
             </div>
           </div>
         </div>
+
+        <div class="status" v-if="listLoading">正在获取学籍状态…</div>
+        <div class="error" v-if="listError">{{ listError }}</div>
 
         <div class="card table">
           <div class="table-head">

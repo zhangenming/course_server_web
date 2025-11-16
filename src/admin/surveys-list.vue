@@ -53,6 +53,29 @@ const deleteSurvey = async (it: { id: number }) => {
     deleteLoading.value = null
   }
 }
+
+const showDetail = ref(false)
+const detailLoading = ref(false)
+const detailError = ref<string | null>(null)
+const detail = ref<any | null>(null)
+const openDetail = async (it: { id: number }) => {
+  if (!it?.id) return
+  showDetail.value = true
+  detailLoading.value = true
+  detailError.value = null
+  detail.value = null
+  try {
+    const data = await apiJson(`/api/v1/surveys/${it.id}`)
+    detail.value = data
+  } catch (e: any) {
+    detailError.value = e?.message || '加载失败'
+  } finally {
+    detailLoading.value = false
+  }
+}
+const closeDetail = () => {
+  showDetail.value = false
+}
 </script>
 
 <template>
@@ -70,6 +93,7 @@ const deleteSurvey = async (it: { id: number }) => {
             <div class="card-title">{{ it.theme || '未命名问卷' }}</div>
           </div>
           <div class="card-actions">
+            <el-button @click="openDetail(it)">查看</el-button>
             <el-button type="danger" :disabled="deleteLoading === it.id" @click="deleteSurvey(it)">删除</el-button>
           </div>
         </div>
@@ -99,6 +123,40 @@ const deleteSurvey = async (it: { id: number }) => {
           <el-button type="primary" @click="formRef?.createSurvey?.()">
             创建问卷
           </el-button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showDetail" class="modal-overlay" @click.self="closeDetail">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">问卷详情</div>
+          <el-button class="modal-close" circle @click="closeDetail">×</el-button>
+        </div>
+        <div class="modal-body">
+          <div v-if="detailLoading" class="status">正在加载…</div>
+          <div v-if="detailError" class="error">{{ detailError }}</div>
+          <div v-if="detail && !detailLoading">
+            <div class="detail-row"><span class="label">标题</span><span class="value">{{ (detail as any).theme || '未命名问卷' }}</span></div>
+            <div class="detail-row"><span class="label">题目数</span><span class="value">{{ Array.isArray((detail as any).questions) ? (detail as any).questions.length : 0 }}</span></div>
+            <div class="detail-row"><span class="label">评分档</span><span class="value">{{ Array.isArray((detail as any).ranges) ? (detail as any).ranges.length : 0 }}</span></div>
+            <div class="sub-title">题目列表</div>
+            <div class="list-block" v-if="Array.isArray((detail as any).questions) && (detail as any).questions.length">
+              <div class="q-item" v-for="(q, i) in (detail as any).questions" :key="'q-'+i">
+                <div class="q-title">{{ q.text || ('题目 ' + (i+1)) }}</div>
+                <div class="opt-list">
+                  <div class="opt" v-for="(o, j) in (q.options || [])" :key="'o-'+j">{{ o.text || ('选项 ' + (j+1)) }}（{{ Number(o.value || 0) }}分）</div>
+                </div>
+              </div>
+            </div>
+            <div class="sub-title">评分规则</div>
+            <div class="list-block" v-if="Array.isArray((detail as any).ranges) && (detail as any).ranges.length">
+              <div class="r-item" v-for="(r, k) in (detail as any).ranges" :key="'r-'+k">≥ {{ Number(r.min || 0) }}：{{ r.label || '未命名' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <el-button @click="closeDetail">关闭</el-button>
         </div>
       </div>
     </div>
@@ -242,6 +300,16 @@ const deleteSurvey = async (it: { id: number }) => {
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 16px;
 }
+.detail-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; padding: 6px 0; }
+.detail-row .label { color: #6b7280; }
+.detail-row .value { color: #111827; font-weight: 600; }
+.sub-title { margin-top: 10px; font-weight: 600; color: #374151; }
+.list-block { display: grid; gap: 6px; margin-top: 6px; }
+.q-item { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; }
+.q-title { font-weight: 600; color: #111827; margin-bottom: 6px; }
+.opt-list { display: grid; gap: 4px; }
+.opt { font-size: 12px; color: #374151; }
+.r-item { font-size: 12px; color: #374151; }
 
 @media (max-width: 960px) {
   .modal-overlay {

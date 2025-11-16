@@ -17,12 +17,24 @@ const active = ref<'students' | 'videos' | 'music' | 'courses' | 'surveysList' |
 const onSelect = (key: string) => {
   active.value = key as any
 }
+const logout = () => {
+  try {
+    delete (window as any).token
+    delete (localStorage as any).token
+  } catch {}
+  try {
+    location.reload()
+  } catch {}
+}
 </script>
 
 <template>
   <div class="admin">
     <div class="topbar">
       <div class="system-title">芳香疗愈体验管理系统</div>
+      <div class="top-actions">
+        <el-button size="small" @click="logout">退出系统</el-button>
+      </div>
     </div>
     <div class="layout">
       <aside class="sidebar">
@@ -158,11 +170,15 @@ const onSelect = (key: string) => {
   color: #fff;
   padding: 12px 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .system-title {
   font-weight: 700;
   letter-spacing: 0.5px;
 }
+.top-actions :deep(.el-button) { background: #fff; color: var(--primary); border-color: #fff; }
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;

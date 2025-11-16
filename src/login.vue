@@ -38,7 +38,7 @@ const submit = async () => {
       location.reload()
     } else {
       const msg = (data as any)?.messgae || (data as any)?.message
-      notify(msg || '未返回令牌')
+      notify(msg || '用户名或密码错误')
     }
   } catch (e: any) {
     notify(e?.message || '网络错误')

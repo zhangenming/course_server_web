@@ -1,6 +1,6 @@
 export function apiFetch(input: string, init?: any) {
   const headers = new Headers(init?.headers as any)
-  const token = (window as any).token || (localStorage as any).token
+  const token = (localStorage as any).token
   if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
   let url = input
   if (!/^https?:\/\//.test(url)) {
@@ -67,7 +67,7 @@ export function apiFetch(input: string, init?: any) {
     fetchInit.method = method
   }
   return fetch(url, fetchInit).then(res => {
-    if ((res.status === 401 || res.status === 403) && !(window as any)._redirectingToLogin) {
+    if ((res.status === 401) && !(window as any)._redirectingToLogin) {
       ;(window as any)._redirectingToLogin = true
       try {
         delete (window as any).token
