@@ -48,7 +48,7 @@ const submit = async () => {
       method: 'POST',
       body: fd,
     })
-    result.value = data?.data || data
+    result.value = data
     showCreate.value = false
     await loadList()
   } catch (e: any) {
@@ -86,7 +86,7 @@ const loadList = async () => {
   items.value = []
   try {
     const data = await apiJson(`api/v1/music/`)
-    items.value = data?.data || data
+    items.value = data
   } catch (e: any) {
     listError.value = e?.message || '网络错误'
   } finally {

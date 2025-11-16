@@ -31,7 +31,7 @@ const submit = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: username.value, password: password.value, role: 'admin' }),
     })
-    const token = (data as any)?.data?.token || (data as any)?.token
+    const token = (data as any)?.token || (data as any)?.data?.token
     if (token) {
       ;(window as any).token = token
       localStorage.token = token

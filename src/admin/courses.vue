@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { apiJson } from '@/utils/request'
 
 const listLoading = ref(false)
@@ -12,7 +13,7 @@ const loadList = async () => {
   items.value = []
   try {
     const data = await apiJson(`api/v1/courses/simple`)
-    items.value = (data as any).data || data
+    items.value = data
   } catch (e: any) {
     listError.value = e?.message || '网络错误'
   } finally {
@@ -35,7 +36,7 @@ const loadVideos = async () => {
   allVideos.value = []
   try {
     const data = await apiJson(`api/v1/videos/`)
-    allVideos.value = (data as any).data || data
+    allVideos.value = data
   } catch (e: any) {
     videosError.value = e?.message || '网络错误'
   } finally {
@@ -100,6 +101,27 @@ const submit = async () => {
 onMounted(() => {
   loadList()
 })
+
+const deleteLoading = ref<number | null>(null)
+const deleteError = ref<string | null>(null)
+const deleteCourse = async (it: any) => {
+  if (!it?.id) return
+  try {
+    await ElMessageBox.confirm('确定删除该课程？', '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
+  deleteLoading.value = it.id
+  deleteError.value = null
+  try {
+    await apiJson(`api/v1/courses/${it.id}`, { method: 'DELETE' })
+    await loadList()
+  } catch (e: any) {
+    deleteError.value = e?.message || '删除失败'
+  } finally {
+    deleteLoading.value = null
+  }
+}
 </script>
 
 <template>
@@ -119,8 +141,12 @@ onMounted(() => {
             <div class="card-desc">{{ it.description || '暂无描述' }}</div>
             <div class="card-meta">视频数：{{ Array.isArray(it.video_ids) ? it.video_ids.length : (it.videos?.length || 0) }}</div>
           </div>
+          <div class="card-actions">
+            <el-button type="danger" :disabled="deleteLoading === it.id" @click="deleteCourse(it)">删除</el-button>
+          </div>
         </div>
       </div>
+      <div v-if="deleteError" class="error">{{ deleteError }}</div>
     </div>
 
     <div v-if="showCreate" class="modal-overlay">
@@ -196,6 +222,7 @@ onMounted(() => {
 .card-title { font-weight: 700; color: #111827; }
 .card-meta { margin-top: 4px; font-size: 12px; color: #6b7280; }
 .card-desc { margin-top: 6px; color: #374151; font-size: 13px; }
+.card-actions { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; }
 .status { margin-top: 10px; color: #666; }
 .error { margin-top: 10px; color: #ef4444; }
 

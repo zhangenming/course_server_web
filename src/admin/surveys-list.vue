@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import SurveysAdd from './surveys.vue'
 import { apiJson } from '@/utils/request'
 
@@ -13,12 +14,7 @@ const load = async () => {
   items.value = []
   try {
     const data = await apiJson('/api/v1/surveys')
-    const arr = Array.isArray((data as any).data)
-      ? (data as any).data
-      : Array.isArray(data)
-      ? (data as any)
-      : []
-    items.value = arr
+    items.value = Array.isArray(data) ? data : []
   } catch (e: any) {
     error.value = e?.message || '网络错误'
   } finally {
@@ -36,6 +32,27 @@ const closeAdd = () => {
   showAdd.value = false
 }
 const formRef = ref<any>(null)
+
+const deleteLoading = ref<number | null>(null)
+const deleteError = ref<string | null>(null)
+const deleteSurvey = async (it: { id: number }) => {
+  if (!it?.id) return
+  try {
+    await ElMessageBox.confirm('确定删除该问卷？', '提示', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+  } catch {
+    return
+  }
+  deleteLoading.value = it.id
+  deleteError.value = null
+  try {
+    await apiJson(`/api/v1/surveys/${it.id}`, { method: 'DELETE' })
+    await load()
+  } catch (e: any) {
+    deleteError.value = e?.message || '删除失败'
+  } finally {
+    deleteLoading.value = null
+  }
+}
 </script>
 
 <template>
@@ -49,10 +66,16 @@ const formRef = ref<any>(null)
       <div v-if="error" class="error">{{ error }}</div>
       <div v-if="items.length" class="cards">
         <div class="card" v-for="it in items" :key="it.id">
-          <div class="title">{{ it.theme || '未命名问卷' }}</div>
+          <div class="card-body">
+            <div class="card-title">{{ it.theme || '未命名问卷' }}</div>
+          </div>
+          <div class="card-actions">
+            <el-button type="danger" :disabled="deleteLoading === it.id" @click="deleteSurvey(it)">删除</el-button>
+          </div>
         </div>
       </div>
       <div v-else-if="!loading && !error" class="empty">暂无问卷</div>
+      <div v-if="deleteError" class="error">{{ deleteError }}</div>
     </div>
 
     <div v-if="showAdd" class="modal-overlay">
@@ -101,27 +124,12 @@ const formRef = ref<any>(null)
 .error {
   color: #ef4444;
 }
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-.title {
-  font-weight: 700;
-  color: #111827;
-}
-.meta {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #6b7280;
-}
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #d1d5db; }
+.card-body { padding: 12px; flex: 1; }
+.card-actions { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; margin-top: auto; }
+.card-title { font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn {
   padding: 8px 12px;
   border: 1px solid #e5e7eb;

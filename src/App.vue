@@ -176,11 +176,7 @@ const selectedSurveyId = ref<number | null>(null)
 const loadSurveys = async () => {
   try {
     const data = await apiJson('api/v1/surveys')
-    if (Array.isArray(data)) {
-      surveys.value = data
-    } else if (Array.isArray((data as any).data)) {
-      surveys.value = (data as any).data
-    }
+    if (Array.isArray(data)) surveys.value = data
   } catch {}
 }
 
@@ -197,7 +193,7 @@ const chooseSurveyTheme = async (s: { id: number; theme: string }) => {
 const fetchSurveyDetail = async (surveyId: number) => {
   try {
     const data = await apiJson(`api/v1/surveys/${surveyId}`)
-    const detail = (data as any).data || data
+    const detail = data
     if (detail?.questions && detail?.ranges) {
       questions.value = detail.questions
       ranges.value = detail.ranges
@@ -328,7 +324,7 @@ const onTouchEnd = () => {
 const playFirstMusic = async () => {
   try {
     const data = await apiJson('api/v1/music/')
-    const list = (data as any)?.data || data
+    const list = data
     const it = Array.isArray(list) ? list[0] : null
     if (!it) return
     let src: string | null = it?.music_url || it?.music || it?.url || null

@@ -66,14 +66,34 @@ export function apiFetch(input: string, init?: any) {
     }
     fetchInit.method = method
   }
-  return fetch(url, fetchInit)
+  return fetch(url, fetchInit).then(res => {
+    if ((res.status === 401 || res.status === 403) && !(window as any)._redirectingToLogin) {
+      ;(window as any)._redirectingToLogin = true
+      try {
+        delete (window as any).token
+        delete (localStorage as any).token
+      } catch {}
+      try {
+        location.reload()
+      } catch {}
+    }
+    return res
+  })
 }
 export async function apiJson(input: string, init?: any) {
   const res = await apiFetch(input, init)
-  const data = await res.json().catch(() => ({}))
+  let data: any = null
+  try {
+    data = await res.json()
+  } catch {
+    data = null
+  }
   if (!res.ok) {
-    const msg = (data as any)?.message || (data as any)?.messgae || `请求失败(${res.status})`
+    const msg = (data as any)?.message || (data as any)?.messgae || (data as any)?.detail || `请求失败(${res.status})`
     throw new Error(msg)
   }
+  if (data && typeof data === 'object' && 'data' in data) return (data as any).data
   return data
 }
+
+window.apiJson = apiJson

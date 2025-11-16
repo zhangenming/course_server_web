@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElDatePicker } from 'element-plus'
 import * as echarts from 'echarts'
+import { apiJson } from '@/utils/request'
 
 type Student = {
   id: string
@@ -53,7 +54,46 @@ const resetFilters = () => {
   filters.value = { from: '', to: '', name: '' }
 }
 
-const addStudent = () => {}
+const showCreate = ref(false)
+const createUsername = ref('')
+const createPassword = ref('')
+const createRole = ref('student')
+const createLoading = ref(false)
+const createError = ref<string | null>(null)
+const createResult = ref<any>(null)
+const openCreate = () => {
+  createUsername.value = ''
+  createPassword.value = ''
+  createRole.value = 'student'
+  createError.value = null
+  createResult.value = null
+  showCreate.value = true
+}
+const closeCreate = () => {
+  showCreate.value = false
+}
+const canCreate = () => {
+  const u = createUsername.value.trim()
+  const p = createPassword.value.trim()
+  return u.length >= 3 && u.length <= 50 && p.length >= 6 && p.length <= 64
+}
+const addStudent = async () => {
+  if (!canCreate() || createLoading.value) return
+  createLoading.value = true
+  createError.value = null
+  createResult.value = null
+  try {
+    const headers = { 'Content-Type': 'application/json' }
+    const body = JSON.stringify({ username: createUsername.value.trim(), password: createPassword.value.trim(), role: createRole.value })
+    const data = await apiJson('api/v1/users/', { method: 'POST', headers, body })
+    createResult.value = data
+    showCreate.value = false
+  } catch (e: any) {
+    createError.value = e?.message || '网络错误'
+  } finally {
+    createLoading.value = false
+  }
+}
 
 const metrics = ref([
   { label: '情绪稳定值', value: 7.8, color: '#22c55e' },
@@ -110,6 +150,7 @@ const resize = () => chart?.resize()
 onMounted(() => {
   initChart()
   window.addEventListener('resize', resize)
+  loadMe()
 })
 
 onBeforeUnmount(() => {
@@ -122,6 +163,34 @@ const completionPercent = computed(() => {
   if (!selected.value) return 0
   return Math.round((selected.value.doneLessons / selected.value.totalLessons) * 100)
 })
+
+const me = ref<any | null>(null)
+const loadMe = async () => {
+  try {
+    me.value = await apiJson('api/v1/users/me')
+  } catch {}
+}
+const meCompletionPercent = computed(() => {
+  const c = Number(me.value?.completed_courses ?? 0)
+  const t = Number(me.value?.total_courses ?? 0)
+  if (!t) return 0
+  return Math.round((c / t) * 100)
+})
+const fmtDate = (s: string) => {
+  try {
+    const d = new Date(s)
+    if (Number.isNaN(d.getTime())) return s
+    const Y = d.getFullYear()
+    const M = String(d.getMonth() + 1).padStart(2, '0')
+    const D = String(d.getDate()).padStart(2, '0')
+    const h = String(d.getHours()).padStart(2, '0')
+    const m = String(d.getMinutes()).padStart(2, '0')
+    const ss = String(d.getSeconds()).padStart(2, '0')
+    return `${Y}-${M}-${D} ${h}:${m}:${ss}`
+  } catch {
+    return s
+  }
+}
 </script>
 
 <template>
@@ -131,7 +200,7 @@ const completionPercent = computed(() => {
         <div class="card header">
           <div class="title">学员管理</div>
           <div class="actions">
-            <el-button type="primary" @click="addStudent">新增学员</el-button>
+            <el-button type="primary" @click="openCreate">新增学员</el-button>
           </div>
         </div>
 
@@ -194,18 +263,17 @@ const completionPercent = computed(() => {
       </section>
 
       <aside class="profile">
-        <div class="card profile-card" v-if="selected">
+        <div class="card profile-card" v-if="me">
           <div class="profile-header">
-            <div class="profile-title">{{ selected!.name }}的学员档案</div>
-            <el-button text class="edit-link">编辑</el-button>
+            <div class="profile-title">{{ (me as any).name ?? (me as any).username }}的学员档案</div>
           </div>
           <div class="profile-inner">
             <div class="avatar"></div>
           <div class="profile-table">
-            <div class="profile-row"><span class="label">姓名</span><span class="value">{{ selected!.name }}</span></div>
-            <div class="profile-row"><span class="label">当前状态</span><span class="value">{{ selected!.status }}</span></div>
-            <div class="profile-row"><span class="label">注册日期</span><span class="value">{{ selected!.registeredAt }}</span></div>
-            <div class="profile-row"><span class="label">已完成课程</span><span class="value">{{ selected!.doneLessons }}节 ({{ completionPercent }}%)</span></div>
+            <div class="profile-row"><span class="label">姓名</span><span class="value">{{ (me as any).name ?? '—' }}</span></div>
+            <div class="profile-row"><span class="label">当前状态</span><span class="value">{{ (me as any).learning_status ?? '—' }}</span></div>
+            <div class="profile-row"><span class="label">注册日期</span><span class="value">{{ fmtDate((me as any).registered_at) }}</span></div>
+            <div class="profile-row"><span class="label">已完成课程</span><span class="value">{{ (me as any).completed_courses ?? 0 }}节 ({{ meCompletionPercent }}%)</span></div>
           </div>
         </div>
         </div>
@@ -225,6 +293,45 @@ const completionPercent = computed(() => {
           <el-button type="danger">归档记录</el-button>
         </div>
       </aside>
+      <div v-if="showCreate" class="modal-overlay" @click.self="closeCreate">
+        <div class="create-modal">
+          <div class="create-header">
+            <h3 class="create-title">新增学员</h3>
+          </div>
+          <div class="create-content">
+            <div class="create-form">
+              <div class="form-row">
+                <label class="form-label">用户名</label>
+                <div class="form-control">
+                  <input type="text" v-model="createUsername" maxlength="50" placeholder="3-50 个字符" />
+                </div>
+              </div>
+              <div class="form-row">
+                <label class="form-label">密码</label>
+              <div class="form-control">
+                <input type="password" v-model="createPassword" maxlength="64" placeholder="6-64 个字符" />
+              </div>
+            </div>
+            <div class="form-row">
+              <label class="form-label">角色</label>
+              <div class="form-control">
+                <select v-model="createRole">
+                  <option value="student">student</option>
+                  <option value="teacher">teacher</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+            </div>
+            <div class="status" v-if="createLoading">正在创建…</div>
+            <div class="error" v-if="createError">{{ createError }}</div>
+          </div>
+        </div>
+        <div class="create-footer">
+            <el-button @click="closeCreate">取消</el-button>
+            <el-button type="primary" :disabled="!canCreate() || createLoading" @click="addStudent">创建</el-button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -284,6 +391,17 @@ input[type='text'] { height: 36px; padding: 0 12px; border: 1px solid #e5e7eb; b
 .bar-wrap .bar { height: 100%; border-radius: 9999px; }
 
 .quick-actions { padding: 14px 16px; display: grid; gap: 8px; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+.create-modal { background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; max-width: 520px; width: 100%; }
+.create-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.create-title { color: #2563eb; font-weight: 700; font-size: 20px; }
+.create-content { display: block; }
+.create-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+.form-row { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: start; margin-bottom: 12px; }
+.form-label { color: #374151; padding-top: 6px; }
+.form-control input { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; }
+.form-control select { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #e0e0e0; border-radius: 8px; }
 
 @media (max-width: 960px) {
   .grid { grid-template-columns: 1fr; }
