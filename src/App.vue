@@ -123,7 +123,6 @@ const hasModal = computed(() => {
     showSurveyThemeSelect.value ||
     showVideoList.value ||
     showListPlayer.value ||
-    showCommandMenu.value ||
     (showSurvey.value && !showResult.value) ||
     showResult.value
   )
@@ -451,7 +450,7 @@ const onTouchEnd = () => {
     .stopToText('16k_zh')
     .then(text => {
       console.log('语音识别结果', text)
-
+if(!text)return
       cas.ask(text)
     })
     .catch(error => console.error('录音停止时出错:', error))
@@ -496,11 +495,12 @@ const appBgUrl = appBg as any as string
   <div class="page">
     <div class="left">
       <div id="container"></div>
+      <div class="ground-shadow" aria-hidden="true"></div>
     </div>
 
     <div class="right">
       <transition name="fade-scale"
-        ><div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay">
+        ><div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay begin-overlay">
           <div class="begin-modal">
             <div class="begin-title">hi~我是抱抱，芳香教室专属助理，请问您是来</div>
             <div class="begin-actions">
@@ -655,7 +655,15 @@ const appBgUrl = appBg as any as string
     @touchend.prevent="onTouchEnd"
     aria-label="按住说话"
   >
-    按住说话
+    <span class="voice-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="18" height="18">
+        <rect x="9" y="4" width="6" height="10" rx="3" fill="currentColor" />
+        <path d="M5 11a7 7 0 0014 0" fill="none" stroke="#fff" stroke-width="1.6" />
+        <path d="M12 18v3" fill="none" stroke="#fff" stroke-width="1.6" />
+        <path d="M8 21h8" fill="none" stroke="#fff" stroke-width="1.6" />
+      </svg>
+    </span>
+    <span class="voice-text">按住说话</span>
   </el-button>
   <transition name="fade-out"><div v-show="!hasModal" class="left-fab">
     <button class="fab-btn" title="课程列表" @click="openVideoList">
@@ -666,9 +674,9 @@ const appBgUrl = appBg as any as string
     </button>
     <button class="fab-btn" title="命令模式" @click="openCommandMenu">
       <svg viewBox="0 0 24 24" width="24" height="24">
-        <path d="M4 12h16" stroke="currentColor" stroke-width="2" fill="none" />
-        <circle cx="12" cy="12" r="5" fill="currentColor" opacity="0.25" />
-        <path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="1.6" />
+        <rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M7 10l3 2-3 2" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M12 14h5" fill="none" stroke="currentColor" stroke-width="1.6" />
       </svg>
     </button>
 
@@ -755,9 +763,8 @@ const appBgUrl = appBg as any as string
 
 .left {
   width: var(--leftWidth);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  min-height: 72vh;
 }
 
 .right {
@@ -769,8 +776,24 @@ const appBgUrl = appBg as any as string
   min-height: 80vh;
 }
 #container {
-  width: 100%;
-  height: min(60vh, calc(var(--leftWidth) * 1.1));
+  position: fixed;
+  left: 15%;
+  bottom: 15%;
+  width: clamp(260px, 22vw, 360px);
+  height: clamp(46vh, 56vh, 64vh);
+  z-index: 1;
+}
+
+.ground-shadow {
+  position: fixed;
+  left: 26px;
+  bottom: 14px;
+  width: clamp(220px, 20vw, 320px);
+  height: 18px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 42%, rgba(0,0,0,0) 72%);
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .begin span {
@@ -784,7 +807,7 @@ const appBgUrl = appBg as any as string
 .begin-modal {
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.12);
   padding: 32px;
   max-width: 640px;
   width: 100%;
@@ -1296,9 +1319,8 @@ const appBgUrl = appBg as any as string
   padding: 20px;
   z-index: 1400;
   background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: saturate(130%) blur(1.5px);
-  -webkit-backdrop-filter: saturate(130%) blur(1.5px);
 }
+.begin-overlay { align-items: flex-start; padding-top: clamp(80px, 18vh, 200px); }
 
 .result-summary {
   display: flex;
@@ -1345,6 +1367,9 @@ const appBgUrl = appBg as any as string
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   overflow: visible;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .voice-button:hover {
   background: #2563eb;
@@ -1373,9 +1398,11 @@ const appBgUrl = appBg as any as string
   }
   100% {
     transform: scale(1.7);
-    opacity: 0;
-  }
+  opacity: 0;
 }
+}
+
+.voice-icon { display: blockx; align-items: center; justify-content: center;padding-right: 5px; }
 .fade-scale-enter-active,
 .fade-scale-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
@@ -1482,7 +1509,7 @@ const appBgUrl = appBg as any as string
   display: flex;
   flex-direction: column;
   gap: 16px;
-  z-index: 1100;
+  z-index: 1501;
 }
 .fab-btn {
   width: 56px;
@@ -1518,11 +1545,11 @@ const appBgUrl = appBg as any as string
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 16px 36px rgba(17, 24, 39, 0.18);
-  padding: 18px;
   width: clamp(560px, 64vw, 980px);
   max-height: 80vh;
   display: flex;
   flex-direction: column;
+  padding: 18px;
   overflow: hidden;
 }
 .video-list-header {
@@ -1540,25 +1567,32 @@ const appBgUrl = appBg as any as string
 }
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 50px;
   flex: 1;
+  padding: 18px;
   overflow: auto;
   padding-right: 6px;
 }
+.video-grid { scrollbar-width: thin; scrollbar-color: #a5b4fc rgba(241,245,249,0.5); }
+.video-grid::-webkit-scrollbar { width: 10px; }
+.video-grid::-webkit-scrollbar-track { background: transparent; }
+.video-grid::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(99,102,241,.35), rgba(147,197,253,.35)); border-radius: 8px; border: 2px solid rgba(255,255,255,.5); }
+.video-grid::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(99,102,241,.55), rgba(147,197,253,.55)); }
 .video-item {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
   background: #fafafa;
-  display: grid;
-  grid-template-columns: 120px 1fr;
-  align-items: stretch;
-  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
+.video-item:nth-child(2n) {
+  transform: translateY(50%);
+}
 .video-item:hover {
-  transform: translateY(-2px);
   border-color: #a78bfa;
   box-shadow: 0 8px 20px rgba(124, 58, 237, 0.15);
 }
@@ -1571,7 +1605,7 @@ const appBgUrl = appBg as any as string
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: 180px;
 }
 .video-item .thumb img {
   width: 100%;
@@ -1581,10 +1615,9 @@ const appBgUrl = appBg as any as string
 }
 .video-item .meta {
   padding: 12px;
-  min-height: 80px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  background: #fff;
 }
 .video-item .name {
   font-weight: 600;
@@ -1622,6 +1655,23 @@ const appBgUrl = appBg as any as string
   }
   .left {
     width: var(--leftWidth);
+    position: static;
+    min-height: auto;
+  }
+  #container {
+    position: fixed;
+    left: 15%;
+    bottom: 15%;
+    width: clamp(220px, 40vw, 280px);
+    height: clamp(40vh, 48vh, 56vh);
+  }
+  .ground-shadow {
+    position: fixed;
+    left: 18px;
+    bottom: 10px;
+    width: clamp(200px, 36vw, 260px);
+    display: block;
+  }
   }
   .right {
     min-width: auto;
@@ -1636,7 +1686,6 @@ const appBgUrl = appBg as any as string
   .modal-overlay {
     align-items: flex-start;
   }
-}
 
 .survey-overlay {
   background: rgba(255, 255, 255, 0.14);
