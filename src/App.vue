@@ -552,6 +552,7 @@ let record: Record
 const isListening = ref(false)
 const onTouchStart = () => {
   isListening.value = true
+  AsrTTS.stop()
   record.start()
 }
 
@@ -573,6 +574,10 @@ const onTouchEnd = () => {
 
       if ( ['聊天','对话'].includes(t)) {
         AsrTTS.start();
+        return
+      }
+      if ( ['下课'].includes(t)) {
+        AsrTTS.stop();
         return
       }
       cas.ask(text)
@@ -1515,8 +1520,6 @@ const appBgUrl = appBg as any as string
 }
 
 .voice-button {
-  left: 50%;
-  bottom: 24px;
   transform: translateX(-50%);
   z-index: 1100;
   background: linear-gradient(#ffffffcc, #ffffffcc) padding-box,
@@ -1524,8 +1527,8 @@ const appBgUrl = appBg as any as string
   color: var(--primary);
   border: 2px solid transparent;
   border-radius: 9999px;
-  width: 100px;
-  height: 100px;
+  width: 130px;
+  height: 200px;
   padding: 0;
   box-shadow: 0 10px 26px rgba(124, 58, 237, 0.22);
   cursor: pointer;
@@ -1533,9 +1536,14 @@ const appBgUrl = appBg as any as string
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: fixed;
+ position: fixed;
+    right: -127px;
+    bottom: 43%;
 }
-
+.voice-button>span{
+ position: relative;
+ left:10px
+}
 .voice-button:hover {
   box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3);
   transform: translateX(-50%) scale(1.02);
