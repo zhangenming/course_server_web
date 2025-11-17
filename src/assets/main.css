@@ -47,3 +47,26 @@ a,
     padding: 0;
   }
 }
+
+/* 统一右上角关闭按钮样式 */
+.close-circle {
+  --el-button-bg-color: #fef2f2;
+  --el-button-text-color: #b91c1c;
+  --el-button-hover-bg-color: #fee2e2;
+  --el-button-hover-text-color: #7f1d1d;
+  --el-button-border-color: #fecaca;
+  --el-button-hover-border-color: #fca5a5;
+  width: 36px;
+  height: 36px;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.close-circle:focus-visible { outline: 2px solid #ef4444; outline-offset: 2px; }
+.close-circle:active { transform: scale(0.96); }

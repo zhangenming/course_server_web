@@ -55,9 +55,7 @@ const getGrade = (score: number) => {
 
 // 当前问题
 const currentQuestion = computed(() => {
-  return (
-    questions.value[currentQuestionIndex.value] || { text: '', options: [] }
-  )
+  return questions.value[currentQuestionIndex.value] || { text: '', options: [] }
 })
 
 // 是否是最后一题
@@ -76,8 +74,7 @@ const selectedCourse = ref<{
 const playingVideo = ref(false)
 const isMusicPlaying = ref(false)
 const audioEl = ref<HTMLAudioElement | null>(null)
-const TEST_VIDEO =
-  'https://xfjs-api.zkyr.net.cn/static/media/vid/9f38419bb0ff4dba.mp4'
+const TEST_VIDEO = 'https://xfjs-api.zkyr.net.cn/static/media/vid/9f38419bb0ff4dba.mp4'
 
 const showVideoList = ref(false)
 const videos = ref<any[]>([])
@@ -87,11 +84,7 @@ const openVideoList = async () => {
   enterIconUI()
   try {
     const data = await apiJson('vite/api/v1/courses/simple')
-    const arr = Array.isArray((data as any)?.data)
-      ? (data as any).data
-      : Array.isArray(data)
-      ? (data as any)
-      : []
+    const arr = Array.isArray((data as any)?.data) ? (data as any).data : Array.isArray(data) ? (data as any) : []
     videos.value = arr
   } catch {
     videos.value = []
@@ -111,6 +104,30 @@ const closeListPlayer = () => {
   listPlayerSrc.value = null
   showVideoList.value = true
 }
+const onListPlayerEnded = async () => {
+  showListPlayer.value = false
+  if (listPlayerSrc.value && listPlayerSrc.value.startsWith('blob:')) {
+    URL.revokeObjectURL(listPlayerSrc.value)
+  }
+  listPlayerSrc.value = null
+  showSurveyThemeSelect.value = true
+  try {
+    await loadSurveys()
+  } catch {}
+}
+
+const hasModal = computed(() => {
+  return (
+    showCourseSelect.value ||
+    (playingVideo.value && !!selectedCourse.value) ||
+    showSurveyThemeSelect.value ||
+    showVideoList.value ||
+    showListPlayer.value ||
+    showCommandMenu.value ||
+    (showSurvey.value && !showResult.value) ||
+    showResult.value
+  )
+})
 const listError = ref<string | null>(null)
 let listErrTimer: number | undefined
 const notifyListError = (msg: string) => {
@@ -136,22 +153,13 @@ const enterIconUI = () => {
   showBegin.value = false
 }
 const exitIconUI = () => {
-  if (
-    !showSurvey.value &&
-    !showResult.value &&
-    !playingVideo.value &&
-    !showVideoList.value &&
-    !showListPlayer.value &&
-    !showCommandMenu.value
-  ) {
+  if (!showSurvey.value && !showResult.value && !playingVideo.value && !showVideoList.value && !showListPlayer.value && !showCommandMenu.value) {
     showBegin.value = true
   }
 }
 
 const showCommandMenu = ref(false)
-const commandList = ref<
-  Array<{ label: string; icon: string; command?: string }>
->([
+const commandList = ref<Array<{ label: string; icon: string; command?: string }>>([
   { label: '柔和模式', icon: '🧡', command: 'soft' },
   { label: '香氛模式3', icon: '🪔', command: 'fragrance3' },
   { label: '香氛模式2', icon: '🪔', command: 'fragrance2' },
@@ -168,14 +176,15 @@ const closeCommandMenu = () => {
   showCommandMenu.value = false
   exitIconUI()
 }
-const execCommand = (cmd: {
-  label: string
-  icon: string
-  command?: string
-}) => {
+const execCommand = async (cmd: { label: string; icon: string; command?: string }) => {
   speakCas(cmd.label)
   showCommandMenu.value = false
   exitIconUI()
+  try {
+    await apiJson('vite/commons/', { method: 'POST', body: { name: cmd.label } })
+  } catch (e: any) {
+    notifyListError(e?.message || '指令执行失败')
+  }
 }
 
 const closeSurveyPick = () => {
@@ -243,13 +252,7 @@ const startSurvey = () => {
   userAnswers.value = []
   showResult.value = false
 }
-const chooseCourse = (course: {
-  id: number
-  title: string
-  description: string | null
-  video_url: string | null
-  cover_url: string | null
-}) => {
+const chooseCourse = (course: { id: number; title: string; description: string | null; video_url: string | null; cover_url: string | null }) => {
   if (!course.video_url) return
   selectedCourse.value = course
   showCourseSelect.value = false
@@ -352,7 +355,9 @@ const restartSurvey = () => {
 }
 const closeResultModal = () => {
   showResult.value = false
+  showSurvey.value = false
   exitIconUI()
+  handleJsx()
 }
 
 // 处理日常巡检点击
@@ -426,8 +431,7 @@ onMounted(async () => {
 function handleJsx() {
   setTimeout(() => {
     speakCas('请问您是否坐好了')
-    // 在这里弹出语言输入按钮
-  }, 3 * 1000)
+  }, 1000 * (location.port === '5174' ? 3 : 30))
 }
 
 let record: Record
@@ -435,7 +439,9 @@ let record: Record
   record = new Record(await createAccessToken(), 'actor_118544')
 })()
 
+const isListening = ref(false)
 const onTouchStart = () => {
+  isListening.value = true
   record.start()
 }
 
@@ -449,6 +455,7 @@ const onTouchEnd = () => {
       cas.ask(text)
     })
     .catch(error => console.error('录音停止时出错:', error))
+  isListening.value = false
 }
 
 const normalizeUrl = (s: any) => {
@@ -493,18 +500,11 @@ const appBgUrl = appBg as any as string
 
     <div class="right">
       <transition name="fade-scale"
-        ><div
-          v-if="showBegin && !showSurvey && !showResult"
-          class="modal-overlay"
-        >
+        ><div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay">
           <div class="begin-modal">
-            <div class="begin-title">
-              hi~我是抱抱，芳香教室专属助理，请问您是来
-            </div>
+            <div class="begin-title">hi~我是抱抱，芳香教室专属助理，请问您是来</div>
             <div class="begin-actions">
-              <el-button type="primary" @click="startSurvey">
-                体验课程
-              </el-button>
+              <el-button type="primary" @click="startSurvey"> 体验课程 </el-button>
               <el-button @click="handleInspectionClick"> 日常巡检 </el-button>
               <el-button @click="startChat"> 进行聊天 </el-button>
             </div>
@@ -533,9 +533,7 @@ const appBgUrl = appBg as any as string
                 <div class="info">
                   <div class="title">{{ course.title }}</div>
                   <div class="desc">{{ course.description || '暂无描述' }}</div>
-                  <div class="tip" v-if="!course.video_url">
-                    无视频，暂不可体验
-                  </div>
+                  <div class="tip" v-if="!course.video_url">无视频，暂不可体验</div>
                 </div>
               </div>
             </div>
@@ -544,20 +542,9 @@ const appBgUrl = appBg as any as string
       >
 
       <transition name="fade-scale"
-        ><div
-          v-if="playingVideo && selectedCourse"
-          class="modal-overlay"
-          @click.self="closeVideo"
-        >
+        ><div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
           <div class="video-modal">
-            <el-button
-              class="video-close"
-              @click="closeVideo"
-              aria-label="关闭视频"
-              title="关闭"
-            >
-              ×
-            </el-button>
+            <el-button class="close-circle" @click="closeVideo" aria-label="关闭视频" title="关闭"> × </el-button>
             <video
               :key="selectedCourse.id"
               :src="selectedCourse.video_url!"
@@ -572,23 +559,14 @@ const appBgUrl = appBg as any as string
           </div></div
       ></transition>
 
-      <audio
-        ref="audioEl"
-        style="display: none"
-        @ended="isMusicPlaying = false"
-        @error="isMusicPlaying = false"
-      ></audio>
+      <audio ref="audioEl" style="display: none" @ended="isMusicPlaying = false" @error="isMusicPlaying = false"></audio>
 
       <transition name="fade-scale"
-        ><div
-          v-if="showSurveyThemeSelect"
-          class="modal-overlay top-overlay survey-overlay"
-          @click.self="closeSurveyPick"
-        >
+        ><div v-if="showSurveyThemeSelect" class="modal-overlay top-overlay survey-overlay" @click.self="closeSurveyPick">
           <div class="survey-dialog">
             <div class="dialog-header">
               <h3>测评</h3>
-              <el-button @click="closeSurveyPick">关闭</el-button>
+              <el-button class="close-circle" @click="closeSurveyPick" aria-label="关闭" title="关闭">×</el-button>
             </div>
             <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
             <div class="dialog-list">
@@ -603,12 +581,7 @@ const appBgUrl = appBg as any as string
               </button>
             </div>
             <div class="dialog-actions">
-              <el-button
-                type="primary"
-                :disabled="!selectedSurveyId"
-                @click="startSurveyPick"
-                >开始测评</el-button
-              >
+              <el-button type="primary" :disabled="!selectedSurveyId" @click="startSurveyPick">开始测评</el-button>
             </div>
           </div>
         </div></transition
@@ -619,8 +592,9 @@ const appBgUrl = appBg as any as string
           <div class="survey-container">
             <div class="survey-header">
               <h2>问卷答题</h2>
-              <div class="progress">
-                题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
+              <div class="header-right">
+                <div class="progress">题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</div>
+                <el-button class="close-circle" @click="goHome" aria-label="关闭" title="关闭">×</el-button>
               </div>
             </div>
 
@@ -637,27 +611,18 @@ const appBgUrl = appBg as any as string
                   }"
                   @click="selectAnswer(index, option.value)"
                 >
-                  <span class="option-label">{{
-                    String.fromCharCode(65 + index)
-                  }}</span>
+                  <span class="option-label">{{ String.fromCharCode(65 + index) }}</span>
                   <span class="option-text">{{ option.text }}</span>
                   <span class="option-value">{{ option.value }}分</span>
                 </div>
               </div>
 
               <div class="navigation">
-                <el-button
-                  @click="prevQuestion"
-                  :disabled="currentQuestionIndex === 0"
-                  >上一题</el-button
-                >
+                <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
 
-                <el-button
-                  type="primary"
-                  @click="nextQuestion"
-                  :disabled="selectedIndex[currentQuestionIndex] === undefined"
-                  >{{ isLastQuestion ? '提交' : '下一题' }}</el-button
-                >
+                <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
+                  isLastQuestion ? '提交' : '下一题'
+                }}</el-button>
               </div>
             </div>
           </div>
@@ -669,16 +634,12 @@ const appBgUrl = appBg as any as string
           <div class="result-card">
             <div class="result-summary">
               <span class="result-prefix">根据您的情况</span>
-              <span class="grade-badge">{{
-                getGrade(totalScore)?.label || ''
-              }}</span>
+              <span class="grade-badge">{{ getGrade(totalScore)?.label || '' }}</span>
             </div>
-              <div class="result-actions">
-                <el-button type="primary" @click="restartSurvey">
-                  重新评测
-                </el-button>
-                <el-button type="primary" @click="closeResultModal">继续</el-button>
-              </div>
+            <div class="result-actions">
+              <el-button type="primary" @click="restartSurvey"> 重新评测 </el-button>
+              <el-button type="primary" @click="closeResultModal">继续</el-button>
+            </div>
           </div>
         </div></transition
       >
@@ -686,6 +647,7 @@ const appBgUrl = appBg as any as string
   </div>
   <el-button
     class="voice-button"
+    :class="{ listening: isListening }"
     @mousedown="onTouchStart"
     @mouseup="onTouchEnd"
     @mouseleave="onTouchEnd"
@@ -695,19 +657,10 @@ const appBgUrl = appBg as any as string
   >
     按住说话
   </el-button>
-  <div class="left-fab">
+  <transition name="fade-out"><div v-show="!hasModal" class="left-fab">
     <button class="fab-btn" title="课程列表" @click="openVideoList">
       <svg viewBox="0 0 24 24" width="22" height="22">
-        <rect
-          x="5"
-          y="7"
-          width="14"
-          height="10"
-          rx="2"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
+        <rect x="5" y="7" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
         <path d="M10 9l6 3-6 3V9" fill="currentColor" />
       </svg>
     </button>
@@ -719,31 +672,13 @@ const appBgUrl = appBg as any as string
       </svg>
     </button>
 
-    <button
-      class="fab-btn"
-      :title="isMusicPlaying ? '停止音乐' : '播放音乐'"
-      @click="toggleFabMusic"
-    >
+    <button class="fab-btn" :title="isMusicPlaying ? '停止音乐' : '播放音乐'" @click="toggleFabMusic">
       <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
         <path d="M10 8l6 4-6 4V8" fill="currentColor" />
       </svg>
       <svg v-else viewBox="0 0 24 24" width="24" height="24">
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
         <rect x="8" y="7" width="3" height="10" fill="currentColor" />
         <rect x="13" y="7" width="3" height="10" fill="currentColor" />
       </svg>
@@ -756,25 +691,16 @@ const appBgUrl = appBg as any as string
         <path d="M9 17h6" stroke="currentColor" stroke-width="1.6" />
       </svg>
     </button>
-  </div>
+  </div></transition>
   <transition name="fade-scale"
-    ><div
-      v-if="showVideoList"
-      class="modal-overlay top-overlay"
-      @click.self="closeVideoList"
-    >
+    ><div v-if="showVideoList" class="modal-overlay top-overlay" @click.self="closeVideoList">
       <div class="video-list-modal">
         <div class="video-list-header">
           <h2>课程列表</h2>
-          <el-button @click="closeVideoList">关闭</el-button>
+          <el-button class="close-circle" @click="closeVideoList" aria-label="关闭" title="关闭">×</el-button>
         </div>
         <div class="video-grid">
-          <div
-            class="video-item"
-            v-for="v in videos"
-            :key="v.id"
-            @click="playVideoFromList(v)"
-          >
+          <div class="video-item" v-for="v in videos" :key="v.id" @click="playVideoFromList(v)">
             <div class="thumb">
               <img :src="v.i_url || v.cover_url || ''" alt="thumbnail" />
             </div>
@@ -788,18 +714,9 @@ const appBgUrl = appBg as any as string
     </div></transition
   >
   <transition name="fade-scale"
-    ><div
-      v-if="showCommandMenu"
-      class="cmd-overlay"
-      @click.self="closeCommandMenu"
-    >
+    ><div v-if="showCommandMenu" class="cmd-overlay" @click.self="closeCommandMenu">
       <div class="cmd-menu">
-        <div
-          class="cmd-item"
-          v-for="(c, i) in commandList"
-          :key="i"
-          @click="execCommand(c)"
-        >
+        <div class="cmd-item" v-for="(c, i) in commandList" :key="i" @click="execCommand(c)">
           <span class="cmd-icon">{{ c.icon }}</span>
           <span class="cmd-label">{{ c.label }}</span>
         </div>
@@ -810,28 +727,10 @@ const appBgUrl = appBg as any as string
     {{ listError }}
   </div>
   <transition name="fade-scale"
-    ><div
-      v-if="showListPlayer && listPlayerSrc"
-      class="modal-overlay"
-      @click.self="closeListPlayer"
-    >
+    ><div v-if="showListPlayer && listPlayerSrc" class="modal-overlay" @click.self="closeListPlayer">
       <div class="video-modal">
-        <el-button
-          class="video-close"
-          @click="closeListPlayer"
-          aria-label="关闭视频"
-          title="关闭"
-          >×</el-button
-        >
-        <video
-          :src="listPlayerSrc!"
-          controls
-          autoplay
-          playsinline
-          preload="metadata"
-          @ended="closeListPlayer"
-          @error="onListPlayerError"
-        ></video>
+        <el-button class="close-circle" @click="closeListPlayer" aria-label="关闭视频" title="关闭">×</el-button>
+        <video :src="listPlayerSrc!" controls autoplay playsinline preload="metadata" @ended="onListPlayerEnded" @error="onListPlayerError"></video>
       </div></div
   ></transition>
 </template>
@@ -1022,6 +921,12 @@ const appBgUrl = appBg as any as string
   position: relative;
   z-index: 1;
 }
+.video-modal .close-circle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
 .video-close {
   position: absolute;
   top: 12px;
@@ -1187,6 +1092,38 @@ const appBgUrl = appBg as any as string
 .progress {
   font-size: 14px;
   color: #666;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.close-btn {
+  --el-button-bg-color: #fef2f2;
+  --el-button-text-color: #b91c1c;
+  --el-button-hover-bg-color: #fee2e2;
+  --el-button-hover-text-color: #7f1d1d;
+  --el-button-border-color: #fecaca;
+  --el-button-hover-border-color: #fca5a5;
+  width: 36px;
+  height: 36px;
+  aspect-ratio: 1 / 1;
+  padding: 15px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.close-btn:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+.close-btn:active {
+  transform: scale(0.96);
 }
 
 .question-card {
@@ -1396,22 +1333,48 @@ const appBgUrl = appBg as any as string
 }
 .voice-button {
   position: fixed;
-  right: 24px;
+  left: 50%;
   bottom: 24px;
+  transform: translateX(-50%);
   z-index: 1100;
   background: #3b82f6;
   color: #fff;
   border: none;
   border-radius: 9999px;
-  padding: 12px 16px;
+  padding: 12px 18px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
   cursor: pointer;
+  overflow: visible;
 }
 .voice-button:hover {
   background: #2563eb;
 }
 .voice-button:active {
-  transform: scale(0.98);
+  transform: translateX(-50%) scale(0.98);
+}
+.voice-button.listening::after,
+.voice-button.listening::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px solid #93c5fd;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: ripple 1.6s ease-out infinite;
+}
+.voice-button.listening::before {
+  animation-delay: 0.6s;
+  opacity: 0.6;
+}
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
 }
 .fade-scale-enter-active,
 .fade-scale-leave-active {
@@ -1426,6 +1389,15 @@ const appBgUrl = appBg as any as string
 .fade-down-enter-active,
 .fade-down-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.fade-out-enter-active,
+.fade-out-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.fade-out-enter-from,
+.fade-out-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 .fade-down-enter-from,
 .fade-down-leave-to {
@@ -1519,8 +1491,7 @@ const appBgUrl = appBg as any as string
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1534,8 +1505,7 @@ const appBgUrl = appBg as any as string
 }
 .fab-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
   filter: brightness(1.05);
 }
 .fab-btn:active {
@@ -1585,8 +1555,7 @@ const appBgUrl = appBg as any as string
   grid-template-columns: 120px 1fr;
   align-items: stretch;
   min-height: 110px;
-  transition: transform 0.16s ease, box-shadow 0.16s ease,
-    border-color 0.16s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 .video-item:hover {
   transform: translateY(-2px);
