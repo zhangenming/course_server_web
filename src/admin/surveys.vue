@@ -110,12 +110,14 @@ const removeQuestion = (index: number) => {
 
 // 添加选项：新增后聚焦新选项
 const addOption = (qi: number) => {
-  questions.value[qi].options.push({ text: '', value: null })
-  nextTick(() => {
-    const arr = optionInputs.value[qi] || []
-    const el = arr[arr.length - 1]
-    el?.focus()
-  })
+  if (questions.value[qi] && questions.value[qi].options) {
+    questions.value[qi].options.push({ text: '', value: null })
+    nextTick(() => {
+      const arr = optionInputs.value[qi] || []
+      const el = arr[arr.length - 1]
+      el?.focus()
+    })
+  }
 }
 
 // 如果后续要汇总配置，可继续用 s；这里让 s.questions 指向题目列表
@@ -128,7 +130,8 @@ const ranges = ref<Range[]>([
 ])
 
 const addRange = () => {
-  const lastMin = ranges.value.at(-1)?.min ?? 0
+  const lastRange = ranges.value.length > 0 ? ranges.value[ranges.value.length - 1] : null
+  const lastMin = lastRange ? lastRange.min : 0
   ranges.value.push({ min: lastMin + 10, label: '', command: '' })
 }
 const removeRange = (i: number) => {
@@ -149,8 +152,9 @@ const hasDuplicateMins = computed(() => {
 const totalQuestions = computed(() => questions.value.length)
 const maxScore = computed(() =>
   questions.value.reduce((sum, q) => {
+    if (!q.options || !Array.isArray(q.options)) return sum
     const maxOpt = q.options.reduce((m, o) => {
-      const v = Number.isFinite(o.value) ? o.value : 0
+      const v = Number.isFinite(o.value) ? (o.value || 0) : 0
       return Math.max(m, v)
     }, 0)
     return sum + maxOpt

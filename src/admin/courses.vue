@@ -183,6 +183,10 @@ const deleteCourse = async (it: any) => {
                     draggable="true"
                     @dragstart="onDragStartVideo(v.id)"
                   >
+                    <div class="vi-cover">
+                      <img v-if="v.cover_url || v.cover" :src="v.cover_url || v.cover" alt="封面" />
+                      <div v-else class="cover-placeholder">无封面</div>
+                    </div>
                     <div class="vi-title">{{ v.name || '未命名视频' }}</div>
                     <el-button @click="!selectedVideoIds.includes(v.id) && selectedVideoIds.push(v.id)">添加</el-button>
                   </div>
@@ -193,6 +197,14 @@ const deleteCourse = async (it: any) => {
                 <div class="panel-title">已选择视频（{{ selectedVideoIds.length }}）</div>
                 <div class="panel-list">
                   <div class="selected-item" v-for="sid in selectedVideoIds" :key="sid">
+                    <div class="vi-cover">
+                      <img
+                        v-if="(allVideos.find(x => x.id === sid) || {}).cover_url || (allVideos.find(x => x.id === sid) || {}).cover"
+                        :src="(allVideos.find(x => x.id === sid) || {}).cover_url || (allVideos.find(x => x.id === sid) || {}).cover"
+                        alt="封面"
+                      />
+                      <div v-else class="cover-placeholder">无封面</div>
+                    </div>
                     <div class="vi-title">{{ (allVideos.find(x => x.id === sid) || {}).name || '视频 ' + sid }}</div>
                     <el-button @click="removeSelected(sid)">移除</el-button>
                   </div>
@@ -243,7 +255,10 @@ const deleteCourse = async (it: any) => {
 .panel-tools { display: flex; gap: 8px; margin-bottom: 8px; }
 .panel-tools input { flex: 1; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; }
 .panel-list { display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 360px; overflow: auto; padding-right: 6px; }
-.video-item, .selected-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.video-item, .selected-item { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.vi-cover { width: 56px; height: 56px; border-radius: 8px; overflow: hidden; background: #f3f4f6; display: flex; align-items: center; justify-content: center; }
+.vi-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover-placeholder { font-size: 12px; color: #9ca3af; }
 .vi-title { font-weight: 600; color: #111827; }
 .vi-meta { font-size: 12px; color: #6b7280; }
 .selected-panel { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 12px; }

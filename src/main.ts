@@ -9,20 +9,37 @@ import Login from './login.vue'
 import App from './App.vue'
 import { apiJson } from '@/utils/request'
 
-
-
-;(async()=>{
+declare global {
+  interface Window {
+    token?: string;
+    id?: number;
+    _redirectingToLogin?: boolean;
+  }
+}
+(async()=>{
   if (localStorage.token) {
     ;(window as any).token = localStorage.token
-    const isAdmin = location.search === '?admin'
-
-    if(isAdmin){
-      window.id = (await apiJson('api/v1/users/me')).user_id
+    const params = new URLSearchParams(location.search)
+    const wantsAdmin = params.has('admin') || location.pathname.startsWith('/admin')
+    let me: any = null
+    try {
+      me = await apiJson('api/v1/users/me') as any
+    } catch {}
+    const isAdminUser = !!(me && (String(me.role || '').toLowerCase() === 'admin'))
+    if (isAdminUser && me && typeof me.user_id === 'number') {
+      window.id = me.user_id
     }
-    const app = createApp(isAdmin ? Admin : App)
+    const shouldMountAdmin = wantsAdmin && isAdminUser
+    if (!shouldMountAdmin && wantsAdmin) {
+      const url = new URL(location.href)
+      url.searchParams.delete('admin')
+      if (url.pathname.startsWith('/admin')) url.pathname = '/'
+      history.replaceState(null, '', url)
+    }
+    const app = createApp(shouldMountAdmin ? Admin : App)
     app.use(ElementPlus, { locale: zhCn })
     app.mount('#app')
-    if (isAdmin) document.body.classList.add('admin-mode')
+    if (shouldMountAdmin) document.body.classList.add('admin-mode')
     else document.body.classList.remove('admin-mode')
   } else {
     const app = createApp(Login)

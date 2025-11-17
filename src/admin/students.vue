@@ -176,6 +176,16 @@ const loadMe = async () => {
     me.value = await apiJson('api/v1/users/me')
   } catch {}
 }
+const avatarInitial = computed(() => {
+  const raw = String(me.value?.name || me.value?.username || '').trim()
+  if (!raw) return ''
+  const first = raw[0]
+  try {
+    return first.toUpperCase()
+  } catch {
+    return first
+  }
+})
 const meCompletionPercent = computed(() => {
   const c = Number(me.value?.completed_courses ?? 0)
   const t = Number(me.value?.total_courses ?? 0)
@@ -296,7 +306,7 @@ const statusLabel = (s: string) => {
             <div class="profile-title">{{ (me as any).name ?? (me as any).username }}的学员档案</div>
           </div>
           <div class="profile-inner">
-            <div class="avatar"></div>
+            <div class="avatar" :aria-label="(me as any).name ?? (me as any).username">{{ avatarInitial }}</div>
           <div class="profile-table">
             <div class="profile-row"><span class="label">姓名</span><span class="value">{{ (me as any).name ?? '—' }}</span></div>
             <div class="profile-row"><span class="label">当前状态</span><span class="value">{{ (me as any).learning_status ?? '—' }}</span></div>
@@ -395,7 +405,7 @@ input[type='text'] { height: 36px; padding: 0 12px; border: 1px solid #e5e7eb; b
 .edit-link { background: transparent; border: none; color: #3B82F6; cursor: pointer; font-size: 14px; }
 .edit-link:hover { text-decoration: underline; }
 .profile-inner { background: #fff; border-radius: 16px; padding: 16px; box-shadow: inset 0 0 0 1px #e5e7eb; }
-.avatar { width: 72px; height: 72px; border-radius: 50%; background: #e5e7eb; margin: 8px auto 12px; }
+.avatar { width: 72px; height: 72px; border-radius: 50%; background: #e5e7eb; margin: 8px auto 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #374151; font-size: 28px; }
 .profile-table { display: grid; }
 .profile-row { display: grid; grid-template-columns: 120px 1fr; align-items: center; height: 40px; border-bottom: 1px solid #E5E7EB; }
 .profile-row:last-child { border-bottom: none; }

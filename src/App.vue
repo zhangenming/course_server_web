@@ -40,9 +40,13 @@ const maxScore = computed(() => {
 
 // 获取评级
 const getGrade = (score: number) => {
+  if (!ranges.value || ranges.value.length === 0) {
+    return { min: 0, label: '未知', command: '' }
+  }
   for (let i = ranges.value.length - 1; i >= 0; i--) {
-    if (score >= ranges.value[i].min) {
-      return ranges.value[i]
+    const range = ranges.value[i]
+    if (range && score >= range.min) {
+      return range
     }
   }
   return ranges.value[0]

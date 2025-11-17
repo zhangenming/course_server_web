@@ -80,6 +80,12 @@ export function apiFetch(input: string, init?: any) {
     return res
   })
 }
+declare global {
+  interface Window {
+    apiJson: typeof apiJson;
+  }
+}
+
 export async function apiJson(input: string, init?: any) {
   const res = await apiFetch(input, init)
   let data: any = null

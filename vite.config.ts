@@ -15,6 +15,7 @@ export default defineConfig({
   // 新增：开发环境代理配置
   server: {
     https: true,
+    host: 'localhost',
     proxy: {
       '/api/v1/quizzes': {
         target: 'http://frp9.aaszxc.asia:12183',
