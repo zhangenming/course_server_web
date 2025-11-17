@@ -8,6 +8,8 @@ export const spks = {
   videoPlaying: '正在播放课程视频',
   videoError: '视频播放失败',
   result: (label: string) => `测评完成，您的结果为：${label}`,
+  course:
+    '根据您的情况，给您推荐甜美风风格精油，请您找好位置坐好，准备开始我们的芳香之旅haha~',
 }
 
 export const replys = {

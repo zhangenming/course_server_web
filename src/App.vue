@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import NextCas from '@nextcas/sdk'
-import { Record } from '@nextcas/voice'
+import {
+  Record,
+  Asr
+} from '@nextcas/voice';
 
 import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
@@ -111,10 +114,13 @@ const onListPlayerEnded = async () => {
     URL.revokeObjectURL(listPlayerSrc.value)
   }
   listPlayerSrc.value = null
+  try {
+    await recordCourseProgress()
+  } catch { }
   showSurveyThemeSelect.value = true
   try {
     await loadSurveys()
-  } catch {}
+  } catch { }
 }
 
 const hasModal = computed(() => {
@@ -142,10 +148,13 @@ const playVideoFromList = (v: any) => {
   listPlayerSrc.value = String(video_url)
   showVideoList.value = false
   showListPlayer.value = true
+  selectedCourse.value = v || null
+  cas.speak(spks.videoPlaying)
   enterIconUI()
 }
 const onListPlayerError = () => {
   notifyListError('视频播放失败，请稍后重试')
+  cas.speak(spks.videoError)
   closeListPlayer()
 }
 
@@ -259,8 +268,37 @@ const chooseCourse = (course: { id: number; title: string; description: string |
   showCourseSelect.value = false
   playingVideo.value = true
 }
+
+
+const meUserId = ref<number | null>(null)
+const ensureUserId = async () => {
+  if (meUserId.value != null) return meUserId.value
+  try {
+    const me = await apiJson('api/v1/users/me')
+    const uid = Number((me as any)?.user_id ?? (me as any)?.data?.user_id)
+    meUserId.value = Number.isFinite(uid) ? uid : null
+  } catch { }
+  return meUserId.value
+}
+const recordCourseProgress = async () => {
+  const courseId = Number((selectedCourse.value as any)?.id)
+  if (!courseId) return
+  const uid = await ensureUserId()
+  const body = { user_id: uid ?? undefined, progress: 100, completed: true, study_minutes: 1 }
+  try {
+    await apiJson(`api/v1/courses/${courseId}/progress`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (e) {
+    console.warn('记录课程进度失败', e)
+  }
+}
+
 const onVideoEnded = () => {
   playingVideo.value = false
+  recordCourseProgress().catch(() => { })
   showSurveyThemeSelect.value = true
   cas.speak(spks.chooseSurvey)
   loadSurveys()
@@ -288,7 +326,7 @@ const stopMusic = () => {
       audioEl.value.pause()
       audioEl.value.src = ''
     }
-  } catch {}
+  } catch { }
   isMusicPlaying.value = false
 }
 const startChat = () => {
@@ -309,7 +347,7 @@ const loadSurveys = async () => {
   try {
     const data = await apiJson('api/v1/surveys')
     if (Array.isArray(data)) surveys.value = data
-  } catch {}
+  } catch { }
 }
 
 const chooseSurveyTheme = async (s: { id: number; theme: string }) => {
@@ -330,18 +368,50 @@ const fetchSurveyDetail = async (surveyId: number) => {
       questions.value = detail.questions
       ranges.value = detail.ranges
     }
-  } catch {}
+  } catch { }
 }
 
+
+const submitSurveyResponses = async () => {
+  const sid = Number(selectedSurveyId.value)
+  if (!sid || !Array.isArray(questions.value) || !questions.value.length) return
+  const answers = questions.value.map((q: any, i: number) => {
+    const optIndex = selectedIndex.value[i]
+    const opt = (q?.options || [])[optIndex]
+    return {
+      question_id: Number(q?.id ?? i + 1),
+      option_id: Number(opt?.id ?? optIndex),
+    }
+  }).filter(x => Number.isFinite(x.option_id))
+  try {
+    await apiJson(`api/v1/surveys/${sid}/responses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers }),
+    })
+  } catch (e: any) {
+    notifyListError(e?.message || '提交答案失败')
+  }
+}
 // 下一题
 const nextQuestion = () => {
   if (isLastQuestion.value) {
-    showResult.value = true
+    submitSurveyResponses().then(() => {
+      showResult.value = true
+    }).catch(() => {
+      showResult.value = true
+    })
     try {
       const grade = getGrade(totalScore.value as any)
       const label = (grade as any)?.label || '未知'
-      cas.speak(spks.result(label))
-    } catch {}
+      cas.speak(spks.result(label), {
+        onEnd: () => {
+          setTimeout(() => {
+            cas.speak(spks.course)
+          }, 400);
+        }
+      })
+    } catch { }
   } else {
     currentQuestionIndex.value++
   }
@@ -399,9 +469,19 @@ const speakCas = (
     },
   })
 }
+let AsrTTS
 onMounted(async () => {
+
+  const token = await createAccessToken()
+
+  AsrTTS = new Asr(token, {
+    actorId: 'actor_118544',
+    model: '16k_zh'
+  })
+
+
   cas = new NextCas(document.getElementById('container')!, {
-    token: await createAccessToken(),
+    token,
     templateName: 'base',
     avatarId: 'avatar_482790',
     actorId: 'actor_118544',
@@ -444,9 +524,9 @@ function handleJsx() {
 }
 
 let record: Record
-;(async () => {
-  record = new Record(await createAccessToken(), 'actor_118544')
-})()
+  ; (async () => {
+    record = new Record(await createAccessToken(), 'actor_118544')
+  })()
 
 const isListening = ref(false)
 const onTouchStart = () => {
@@ -459,13 +539,19 @@ const onTouchEnd = () => {
   record
     .stopToText('16k_zh')
     .then(text => {
-      
+
       console.log('语音识别结果', text)
-      if(!text) return
-      const t = String(text).trim().toLowerCase().replace(/[，。！？、,.!\-\s]/g,'')
-      const intents = ['体验课程','体验课','开始课程','开始体验课程']
-      if (intents.some(k => t.includes(k))){
+      if (!text) return
+      const t = String(text).trim().toLowerCase().replace(/[，。！？、,.!\-\s]/g, '')
+      const intents = ['体验课程', '体验课', '开始课程', '开始体验课程']
+      if (intents.some(k => t.includes(k))) {
         startSurvey()
+        return
+      }
+
+      // 聊天
+      if (t === '聊天') {
+        AsrTTS.start();
         return
       }
       cas.ask(text)
@@ -495,7 +581,7 @@ const playFirstMusic = async () => {
       await audioEl.value.play()
       isMusicPlaying.value = true
     }
-  } catch {}
+  } catch { }
 }
 const toggleFabMusic = async () => {
   if (isMusicPlaying.value) {
@@ -529,21 +615,16 @@ const appBgUrl = appBg as any as string
         </div></transition
       > -->
 
-      <transition name="fade-scale"
-        ><div v-if="showCourseSelect" class="modal-overlay">
+      <transition name="fade-scale">
+        <div v-if="showCourseSelect" class="modal-overlay">
           <div class="course-modal">
             <div class="course-modal-header">
               <h2>请选择体验的课程</h2>
               <el-button @click="backToBegin"> 返回上一步 </el-button>
             </div>
             <div class="course-list">
-              <div
-                class="course-card"
-                :class="{ disabled: !course.video_url }"
-                v-for="course in 课程data"
-                :key="course.id"
-                @click="chooseCourse(course)"
-              >
+              <div class="course-card" :class="{ disabled: !course.video_url }" v-for="course in 课程data"
+                :key="course.id" @click="chooseCourse(course)">
                 <div class="cover" v-if="course.cover_url">
                   <img :src="course.cover_url" alt="cover" />
                 </div>
@@ -555,31 +636,25 @@ const appBgUrl = appBg as any as string
               </div>
             </div>
           </div>
-        </div></transition
-      >
+        </div>
+      </transition>
 
-      <transition name="fade-scale"
-        ><div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
+      <transition name="fade-scale">
+        <div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
           <div class="video-modal">
             <el-button class="close-circle" @click="closeVideo" aria-label="关闭视频" title="关闭"> × </el-button>
-            <video
-              :key="selectedCourse.id"
-              :src="selectedCourse.video_url!"
-              controls
-              autoplay
-              muted
-              playsinline
-              preload="metadata"
-              @ended="onVideoEnded"
-              @error="onVideoError"
-            ></video>
-          </div></div
-      ></transition>
+            <video :key="selectedCourse.id" :src="selectedCourse.video_url!" controls autoplay muted playsinline
+              preload="metadata" @ended="onVideoEnded" @error="onVideoError"></video>
+          </div>
+        </div>
+      </transition>
 
-      <audio ref="audioEl" style="display: none" @ended="isMusicPlaying = false" @error="isMusicPlaying = false"></audio>
+      <audio ref="audioEl" style="display: none" @ended="isMusicPlaying = false"
+        @error="isMusicPlaying = false"></audio>
 
-      <transition name="fade-scale"
-        ><div v-if="showSurveyThemeSelect" class="modal-overlay top-overlay survey-overlay" @click.self="closeSurveyPick">
+      <transition name="fade-scale">
+        <div v-if="showSurveyThemeSelect" class="modal-overlay top-overlay survey-overlay"
+          @click.self="closeSurveyPick">
           <div class="survey-dialog">
             <div class="dialog-header">
               <h3>测评</h3>
@@ -587,13 +662,8 @@ const appBgUrl = appBg as any as string
             </div>
             <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
             <div class="dialog-list">
-              <button
-                class="dialog-item"
-                :class="{ selected: selectedSurveyId === s.id }"
-                v-for="s in surveys"
-                :key="s.id"
-                @click="selectedSurveyId = s.id"
-              >
+              <button class="dialog-item" :class="{ selected: selectedSurveyId === s.id }" v-for="s in surveys"
+                :key="s.id" @click="selectedSurveyId = s.id">
                 <span class="item-text">{{ s.theme || '未命名问卷' }}</span>
               </button>
             </div>
@@ -601,11 +671,11 @@ const appBgUrl = appBg as any as string
               <el-button type="primary" :disabled="!selectedSurveyId" @click="startSurveyPick">开始测评</el-button>
             </div>
           </div>
-        </div></transition
-      >
+        </div>
+      </transition>
 
-      <transition name="fade-scale"
-        ><div v-if="showSurvey && !showResult" class="modal-overlay">
+      <transition name="fade-scale">
+        <div v-if="showSurvey && !showResult" class="modal-overlay">
           <div class="survey-container">
             <div class="survey-header">
               <h2>问卷答题</h2>
@@ -619,15 +689,9 @@ const appBgUrl = appBg as any as string
               <h3>{{ currentQuestion.text }}</h3>
 
               <div class="options">
-                <div
-                  v-for="(option, index) in currentQuestion.options"
-                  :key="index"
-                  class="option"
-                  :class="{
-                    selected: selectedIndex[currentQuestionIndex] === index,
-                  }"
-                  @click="selectAnswer(index, option.value)"
-                >
+                <div v-for="(option, index) in currentQuestion.options" :key="index" class="option" :class="{
+                  selected: selectedIndex[currentQuestionIndex] === index,
+                }" @click="selectAnswer(index, option.value)">
                   <span class="option-label">{{ String.fromCharCode(65 + index) }}</span>
                   <span class="option-text">{{ option.text }}</span>
                   <span class="option-value">{{ option.value }}分</span>
@@ -637,17 +701,18 @@ const appBgUrl = appBg as any as string
               <div class="navigation">
                 <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
 
-                <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
-                  isLastQuestion ? '提交' : '下一题'
-                }}</el-button>
+                <el-button type="primary" @click="nextQuestion"
+                  :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
+                    isLastQuestion ? '提交' : '下一题'
+                  }}</el-button>
               </div>
             </div>
           </div>
-        </div></transition
-      >
+        </div>
+      </transition>
 
-      <transition name="fade-scale"
-        ><div v-if="showResult" class="result-container">
+      <transition name="fade-scale">
+        <div v-if="showResult" class="result-container">
           <div class="result-card">
             <div class="result-summary">
               <span class="result-prefix">根据您的情况</span>
@@ -658,20 +723,12 @@ const appBgUrl = appBg as any as string
               <el-button type="primary" @click="closeResultModal">继续</el-button>
             </div>
           </div>
-        </div></transition
-      >
+        </div>
+      </transition>
     </div>
   </div>
-  <el-button
-    class="voice-button"
-    :class="{ listening: isListening }"
-    @mousedown="onTouchStart"
-    @mouseup="onTouchEnd"
-    @mouseleave="onTouchEnd"
-    @touchstart.prevent="onTouchStart"
-    @touchend.prevent="onTouchEnd"
-    aria-label="按住说话"
-  >
+  <el-button class="voice-button" :class="{ listening: isListening }" @mousedown="onTouchStart" @mouseup="onTouchEnd"
+    @mouseleave="onTouchEnd" @touchstart.prevent="onTouchStart" @touchend.prevent="onTouchEnd" aria-label="按住说话">
     <span class="voice-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="26" height="26">
         <rect x="9" y="4" width="6" height="10" rx="3" fill="currentColor" />
@@ -681,43 +738,45 @@ const appBgUrl = appBg as any as string
       </svg>
     </span>
   </el-button>
-  <transition name="fade-out"><div v-show="!hasModal" class="left-fab">
-    <button class="fab-btn" title="课程列表" @click="openVideoList">
-      <svg viewBox="0 0 24 24" width="22" height="22">
-        <rect x="5" y="7" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M10 9l6 3-6 3V9" fill="currentColor" />
-      </svg>
-    </button>
-    <button class="fab-btn" title="命令模式" @click="openCommandMenu">
-      <svg viewBox="0 0 24 24" width="24" height="24">
-        <rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M7 10l3 2-3 2" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M12 14h5" fill="none" stroke="currentColor" stroke-width="1.6" />
-      </svg>
-    </button>
+  <transition name="fade-out">
+    <div v-show="!hasModal" class="left-fab">
+      <button class="fab-btn" title="课程列表" @click="openVideoList">
+        <svg viewBox="0 0 24 24" width="22" height="22">
+          <rect x="5" y="7" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M10 9l6 3-6 3V9" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="fab-btn" title="命令模式" @click="openCommandMenu">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M7 10l3 2-3 2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M12 14h5" fill="none" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      </button>
 
-    <button class="fab-btn" :title="isMusicPlaying ? '停止音乐' : '播放音乐'" @click="toggleFabMusic">
-      <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M10 8l6 4-6 4V8" fill="currentColor" />
-      </svg>
-      <svg v-else viewBox="0 0 24 24" width="24" height="24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <rect x="8" y="7" width="3" height="10" fill="currentColor" />
-        <rect x="13" y="7" width="3" height="10" fill="currentColor" />
-      </svg>
-    </button>
-    <button class="fab-btn" title="测评选择" @click="openSurveyPicker">
-      <svg viewBox="0 0 24 24" width="22" height="22">
-        <rect x="6" y="5" width="12" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M9 9h6" stroke="currentColor" stroke-width="1.6" />
-        <path d="M9 13h6" stroke="currentColor" stroke-width="1.6" />
-        <path d="M9 17h6" stroke="currentColor" stroke-width="1.6" />
-      </svg>
-    </button>
-  </div></transition>
-  <transition name="fade-scale"
-    ><div v-if="showVideoList" class="modal-overlay top-overlay" @click.self="closeVideoList">
+      <button class="fab-btn" :title="isMusicPlaying ? '停止音乐' : '播放音乐'" @click="toggleFabMusic">
+        <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M10 8l6 4-6 4V8" fill="currentColor" />
+        </svg>
+        <svg v-else viewBox="0 0 24 24" width="24" height="24">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <rect x="8" y="7" width="3" height="10" fill="currentColor" />
+          <rect x="13" y="7" width="3" height="10" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="fab-btn" title="测评选择" @click="openSurveyPicker">
+        <svg viewBox="0 0 24 24" width="22" height="22">
+          <rect x="6" y="5" width="12" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M9 9h6" stroke="currentColor" stroke-width="1.6" />
+          <path d="M9 13h6" stroke="currentColor" stroke-width="1.6" />
+          <path d="M9 17h6" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      </button>
+    </div>
+  </transition>
+  <transition name="fade-scale">
+    <div v-if="showVideoList" class="modal-overlay top-overlay" @click.self="closeVideoList">
       <div class="video-list-modal">
         <div class="video-list-header">
           <h2>课程列表</h2>
@@ -735,28 +794,30 @@ const appBgUrl = appBg as any as string
           </div>
         </div>
       </div>
-    </div></transition
-  >
-  <transition name="fade-scale"
-    ><div v-if="showCommandMenu" class="cmd-overlay" @click.self="closeCommandMenu">
+    </div>
+  </transition>
+  <transition name="fade-scale">
+    <div v-if="showCommandMenu" class="cmd-overlay" @click.self="closeCommandMenu">
       <div class="cmd-menu">
         <div class="cmd-item" v-for="(c, i) in commandList" :key="i" @click="execCommand(c)">
           <span class="cmd-icon">{{ c.icon }}</span>
           <span class="cmd-label">{{ c.label }}</span>
         </div>
       </div>
-    </div></transition
-  >
+    </div>
+  </transition>
   <div v-if="listError" class="banner" role="alert" @click="listError = null">
     {{ listError }}
   </div>
-  <transition name="fade-scale"
-    ><div v-if="showListPlayer && listPlayerSrc" class="modal-overlay" @click.self="closeListPlayer">
+  <transition name="fade-scale">
+    <div v-if="showListPlayer && listPlayerSrc" class="modal-overlay" @click.self="closeListPlayer">
       <div class="video-modal">
         <el-button class="close-circle" @click="closeListPlayer" aria-label="关闭视频" title="关闭">×</el-button>
-        <video :src="listPlayerSrc!" controls autoplay playsinline preload="metadata" @ended="onListPlayerEnded" @error="onListPlayerError"></video>
-      </div></div
-  ></transition>
+        <video :src="listPlayerSrc!" controls autoplay playsinline preload="metadata" @ended="onListPlayerEnded"
+          @error="onListPlayerError"></video>
+      </div>
+    </div>
+  </transition>
 </template>
 
 <style scoped>
@@ -791,6 +852,7 @@ const appBgUrl = appBg as any as string
   justify-content: center;
   min-height: 80vh;
 }
+
 #container {
   position: fixed;
   left: 15%;
@@ -806,7 +868,7 @@ const appBgUrl = appBg as any as string
   bottom: 14px;
   width: clamp(220px, 20vw, 320px);
   height: 18px;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 42%, rgba(0,0,0,0) 72%);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.12) 42%, rgba(0, 0, 0, 0) 72%);
   border-radius: 9999px;
   pointer-events: none;
   z-index: 0;
@@ -850,6 +912,7 @@ const appBgUrl = appBg as any as string
   border-radius: 10px;
   min-width: 140px;
 }
+
 .begin-actions :deep(.el-button--primary) {
   box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
 }
@@ -866,6 +929,7 @@ const appBgUrl = appBg as any as string
   flex-direction: column;
   overflow: hidden;
 }
+
 .course-modal-header {
   display: flex;
   justify-content: space-between;
@@ -882,6 +946,7 @@ const appBgUrl = appBg as any as string
   overflow: auto;
   padding-right: 6px;
 }
+
 .survey-list {
   display: flex;
   flex-direction: column;
@@ -891,6 +956,7 @@ const appBgUrl = appBg as any as string
   overflow: auto;
   padding-right: 6px;
 }
+
 .survey-item {
   display: flex;
   align-items: center;
@@ -899,10 +965,12 @@ const appBgUrl = appBg as any as string
   border-radius: 10px;
   cursor: pointer;
 }
+
 .survey-item:hover {
   border-color: #3b82f6;
   background: #f8f9ff;
 }
+
 .survey-title {
   font-weight: 600;
 }
@@ -916,10 +984,12 @@ const appBgUrl = appBg as any as string
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
+
 .course-card:hover {
   border-color: #3b82f6;
   background: #f8f9ff;
 }
+
 .course-card.disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -931,13 +1001,16 @@ const appBgUrl = appBg as any as string
   object-fit: cover;
   border-radius: 6px;
 }
+
 .course-card .info .title {
   font-weight: 600;
 }
+
 .course-card .info .desc {
   font-size: 12px;
   color: #666;
 }
+
 .course-card .info .tip {
   font-size: 12px;
   color: #ef4444;
@@ -952,6 +1025,7 @@ const appBgUrl = appBg as any as string
   position: relative;
   overflow: hidden;
 }
+
 .video-modal video {
   width: 100%;
   height: auto;
@@ -960,12 +1034,14 @@ const appBgUrl = appBg as any as string
   position: relative;
   z-index: 1;
 }
+
 .video-modal .close-circle {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 2;
 }
+
 .video-close {
   position: absolute;
   top: 12px;
@@ -985,22 +1061,25 @@ const appBgUrl = appBg as any as string
   line-height: 1;
   z-index: 2;
 }
+
 .video-close:hover {
   background: rgba(0, 0, 0, 0.75);
   transform: scale(1.05);
 }
+
 .video-close:focus {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+
 .video-close:active {
   transform: scale(0.98);
 }
 
-.audio-bar {
-}
-.audio-bar audio {
-}
+.audio-bar {}
+
+.audio-bar audio {}
+
 .modal-close {
   position: absolute;
   top: 12px;
@@ -1020,10 +1099,12 @@ const appBgUrl = appBg as any as string
   line-height: 1;
   z-index: 2;
 }
+
 .modal-close:hover {
   background: rgba(0, 0, 0, 0.75);
   transform: scale(1.05);
 }
+
 .top-overlay {
   align-items: flex-start;
   padding-top: 12px;
@@ -1046,6 +1127,7 @@ const appBgUrl = appBg as any as string
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: saturate(130%) blur(1.5px);
 }
+
 .survey-dialog {
   background: #fff;
   border-radius: 16px;
@@ -1058,6 +1140,7 @@ const appBgUrl = appBg as any as string
   overflow: hidden;
   margin: 0 auto;
 }
+
 .dialog-header {
   display: flex;
   justify-content: space-between;
@@ -1066,10 +1149,12 @@ const appBgUrl = appBg as any as string
   padding-bottom: 20px;
   border-bottom: 1px solid #e5e7eb;
 }
+
 .dialog-tip {
   margin: 8px 0 12px;
   color: #64748b;
 }
+
 .dialog-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -1078,11 +1163,30 @@ const appBgUrl = appBg as any as string
   overflow: auto;
   padding-right: 6px;
 }
-.dialog-list { scrollbar-width: thin; scrollbar-color: #a5b4fc rgba(241,245,249,0.5); }
-.dialog-list::-webkit-scrollbar { width: 10px; }
-.dialog-list::-webkit-scrollbar-track { background: transparent; }
-.dialog-list::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(99,102,241,.35), rgba(147,197,253,.35)); border-radius: 8px; border: 2px solid rgba(255,255,255,.5); }
-.dialog-list::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(99,102,241,.55), rgba(147,197,253,.55)); }
+
+.dialog-list {
+  scrollbar-width: thin;
+  scrollbar-color: #a5b4fc rgba(241, 245, 249, 0.5);
+}
+
+.dialog-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dialog-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dialog-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(99, 102, 241, .35), rgba(147, 197, 253, .35));
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, .5);
+}
+
+.dialog-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(99, 102, 241, .55), rgba(147, 197, 253, .55));
+}
+
 .dialog-item {
   display: inline-flex;
   align-items: center;
@@ -1095,14 +1199,17 @@ const appBgUrl = appBg as any as string
   cursor: pointer;
   transition: border-color 0.18s, background 0.18s;
 }
+
 .dialog-item:hover {
   border-color: #3b82f6;
   background: #f0f6ff;
 }
+
 .dialog-item.selected {
   border-color: #3b82f6;
   background: #eef2ff;
 }
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -1145,6 +1252,7 @@ const appBgUrl = appBg as any as string
   align-items: center;
   gap: 10px;
 }
+
 .close-btn {
   --el-button-bg-color: #fef2f2;
   --el-button-text-color: #b91c1c;
@@ -1164,10 +1272,12 @@ const appBgUrl = appBg as any as string
   line-height: 1;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
+
 .close-btn:focus-visible {
   outline: 2px solid #ef4444;
   outline-offset: 2px;
 }
+
 .close-btn:active {
   transform: scale(0.96);
 }
@@ -1343,7 +1453,11 @@ const appBgUrl = appBg as any as string
   z-index: 1400;
   background: rgba(255, 255, 255, 0.08);
 }
-.begin-overlay { align-items: flex-start; padding-top: clamp(80px, 18vh, 200px); }
+
+.begin-overlay {
+  align-items: flex-start;
+  padding-top: clamp(80px, 18vh, 200px);
+}
 
 .result-summary {
   display: flex;
@@ -1357,12 +1471,14 @@ const appBgUrl = appBg as any as string
   border-radius: 12px;
   flex-wrap: nowrap;
 }
+
 .result-prefix {
   color: #64748b;
   font-size: 18px;
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
+
 .grade-badge {
   display: inline-flex;
   align-items: center;
@@ -1376,6 +1492,7 @@ const appBgUrl = appBg as any as string
   font-weight: 600;
   font-size: 16px;
 }
+
 .voice-button {
   position: fixed;
   left: 50%;
@@ -1383,7 +1500,7 @@ const appBgUrl = appBg as any as string
   transform: translateX(-50%);
   z-index: 1100;
   background: linear-gradient(#ffffffcc, #ffffffcc) padding-box,
-    linear-gradient(180deg, rgba(167,139,250,0.9), rgba(96,165,250,0.9)) border-box;
+    linear-gradient(180deg, rgba(167, 139, 250, 0.9), rgba(96, 165, 250, 0.9)) border-box;
   color: var(--primary);
   border: 2px solid transparent;
   border-radius: 9999px;
@@ -1398,20 +1515,33 @@ const appBgUrl = appBg as any as string
   justify-content: center;
   position: relative;
 }
-.voice-button:hover { box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3); transform: translateX(-50%) scale(1.02); }
-.voice-button:active { transform: translateX(-50%) scale(0.98); }
-.voice-icon svg { color: #1f2937; }
+
+.voice-button:hover {
+  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3);
+  transform: translateX(-50%) scale(1.02);
+}
+
+.voice-button:active {
+  transform: translateX(-50%) scale(0.98);
+}
+
+.voice-icon svg {
+  color: #1f2937;
+}
+
 .voice-button::before {
   content: '';
   position: absolute;
   inset: -4px;
   border-radius: 9999px;
-  background: radial-gradient(closest-side, rgba(124,58,237,0.18), rgba(124,58,237,0) 70%);
+  background: radial-gradient(closest-side, rgba(124, 58, 237, 0.18), rgba(124, 58, 237, 0) 70%);
   z-index: -1;
 }
+
 .voice-button:active {
   transform: translateX(-50%) scale(0.98);
 }
+
 .voice-button.listening::after,
 .voice-button.listening::before {
   content: '';
@@ -1422,50 +1552,64 @@ const appBgUrl = appBg as any as string
   pointer-events: none;
   animation: ripple 1.6s ease-out infinite;
 }
+
 .voice-button.listening::before {
   animation-delay: 0.6s;
   opacity: 0.6;
 }
+
 @keyframes ripple {
   0% {
     transform: scale(1);
     opacity: 0.6;
   }
+
   100% {
     transform: scale(1.7);
-  opacity: 0;
-}
+    opacity: 0;
+  }
 }
 
-.voice-icon { display: inline-flex; align-items: center; justify-content: center; }
+.voice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .fade-scale-enter-active,
 .fade-scale-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
 }
+
 .fade-scale-enter-from,
 .fade-scale-leave-to {
   opacity: 0;
   transform: scale(0.98) translateY(8px);
   filter: blur(1px);
 }
+
 .fade-down-enter-active,
 .fade-down-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
+
 .fade-out-enter-active,
 .fade-out-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
+
 .fade-out-enter-from,
 .fade-out-leave-to {
   opacity: 0;
   transform: translateY(6px);
 }
+
 .fade-down-enter-from,
 .fade-down-leave-to {
   opacity: 0;
   transform: translateY(-8px);
 }
+
 .cmd-overlay {
   position: fixed;
   inset: 0;
@@ -1477,6 +1621,7 @@ const appBgUrl = appBg as any as string
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: saturate(130%) blur(1.5px);
 }
+
 .cmd-menu {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: saturate(180%) blur(10px);
@@ -1486,6 +1631,7 @@ const appBgUrl = appBg as any as string
   width: clamp(220px, 24vw, 300px);
   overflow: hidden;
 }
+
 .cmd-item {
   display: grid;
   grid-template-columns: 28px 1fr;
@@ -1495,21 +1641,26 @@ const appBgUrl = appBg as any as string
   border-bottom: 1px solid rgba(226, 232, 240, 0.7);
   cursor: pointer;
 }
+
 .cmd-item:last-child {
   border-bottom: none;
 }
+
 .cmd-item:hover {
   background: #f8fafc;
 }
+
 .cmd-icon {
   font-size: 18px;
   line-height: 1;
   text-align: center;
 }
+
 .cmd-label {
   font-weight: 600;
   color: #111827;
 }
+
 .app-bg {
   position: fixed;
   inset: 0;
@@ -1518,12 +1669,14 @@ const appBgUrl = appBg as any as string
   background-repeat: no-repeat;
   z-index: 0;
 }
+
 .page,
 .left-fab,
 .banner {
   position: relative;
   z-index: 1;
 }
+
 .banner {
   position: fixed;
   top: 24px;
@@ -1536,6 +1689,7 @@ const appBgUrl = appBg as any as string
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
   z-index: 1200;
 }
+
 .left-fab {
   position: fixed;
   left: 24px;
@@ -1546,6 +1700,7 @@ const appBgUrl = appBg as any as string
   gap: 16px;
   z-index: 1501;
 }
+
 .fab-btn {
   width: 56px;
   height: 56px;
@@ -1561,19 +1716,23 @@ const appBgUrl = appBg as any as string
   transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
   backdrop-filter: saturate(160%) blur(2px);
 }
+
 .fab-btn svg {
   width: 26px;
   height: 26px;
 }
+
 .fab-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
   filter: brightness(1.05);
 }
+
 .fab-btn:active {
   transform: translateY(0);
   filter: brightness(0.95);
 }
+
 .video-list-modal {
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: saturate(180%) blur(10px);
@@ -1587,6 +1746,7 @@ const appBgUrl = appBg as any as string
   padding: 18px;
   overflow: hidden;
 }
+
 .video-list-header {
   display: flex;
   justify-content: space-between;
@@ -1595,11 +1755,13 @@ const appBgUrl = appBg as any as string
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.8);
 }
+
 .video-list-header h2 {
   margin: 0;
   font-weight: 700;
   color: #111827;
 }
+
 .video-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1609,11 +1771,30 @@ const appBgUrl = appBg as any as string
   overflow: auto;
   padding-right: 6px;
 }
-.video-grid { scrollbar-width: thin; scrollbar-color: #a5b4fc rgba(241,245,249,0.5); }
-.video-grid::-webkit-scrollbar { width: 10px; }
-.video-grid::-webkit-scrollbar-track { background: transparent; }
-.video-grid::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(99,102,241,.35), rgba(147,197,253,.35)); border-radius: 8px; border: 2px solid rgba(255,255,255,.5); }
-.video-grid::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(99,102,241,.55), rgba(147,197,253,.55)); }
+
+.video-grid {
+  scrollbar-width: thin;
+  scrollbar-color: #a5b4fc rgba(241, 245, 249, 0.5);
+}
+
+.video-grid::-webkit-scrollbar {
+  width: 10px;
+}
+
+.video-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.video-grid::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(99, 102, 241, .35), rgba(147, 197, 253, .35));
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, .5);
+}
+
+.video-grid::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(99, 102, 241, .55), rgba(147, 197, 253, .55));
+}
+
 .video-item {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -1624,17 +1805,21 @@ const appBgUrl = appBg as any as string
   min-height: 240px;
   transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
+
 .video-item:nth-child(2n) {
   transform: translateY(50%);
 }
+
 .video-item:hover {
   border-color: #a78bfa;
   box-shadow: 0 8px 20px rgba(124, 58, 237, 0.15);
 }
+
 .video-item.disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .video-item .thumb {
   background: #f3f4f6;
   display: flex;
@@ -1642,24 +1827,28 @@ const appBgUrl = appBg as any as string
   justify-content: center;
   height: 180px;
 }
+
 .video-item .thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
+
 .video-item .meta {
   padding: 12px;
   display: flex;
   flex-direction: column;
   background: #fff;
 }
+
 .video-item .name {
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .video-item .desc {
   font-size: 12px;
   color: #64748b;
@@ -1669,11 +1858,13 @@ const appBgUrl = appBg as any as string
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
 @media (max-width: 480px) {
   .result-summary {
     gap: 8px;
     padding: 10px 12px;
   }
+
   .result-prefix,
   .grade-badge {
     font-size: 16px;
@@ -1688,11 +1879,13 @@ const appBgUrl = appBg as any as string
     justify-content: center;
     --leftWidth: 300px;
   }
+
   .left {
     width: var(--leftWidth);
     position: static;
     min-height: auto;
   }
+
   #container {
     position: fixed;
     left: 15%;
@@ -1700,6 +1893,7 @@ const appBgUrl = appBg as any as string
     width: 500px;
     height: clamp(40vh, 48vh, 56vh);
   }
+
   .ground-shadow {
     position: fixed;
     left: 18px;
@@ -1707,21 +1901,24 @@ const appBgUrl = appBg as any as string
     width: clamp(200px, 36vw, 260px);
     display: block;
   }
-  }
-  .right {
-    min-width: auto;
-    width: 100%;
-    min-height: auto;
-    align-items: flex-start;
-    padding-top: clamp(24px, 10vh, 80px);
-  }
-  .result-container {
-    width: clamp(520px, 36vw, 640px);
-    margin: 0 auto;
-  }
-  .modal-overlay {
-    align-items: flex-start;
-  }
+}
+
+.right {
+  min-width: auto;
+  width: 100%;
+  min-height: auto;
+  align-items: flex-start;
+  padding-top: clamp(24px, 10vh, 80px);
+}
+
+.result-container {
+  width: clamp(520px, 36vw, 640px);
+  margin: 0 auto;
+}
+
+.modal-overlay {
+  align-items: flex-start;
+}
 
 .survey-overlay {
   background: rgba(255, 255, 255, 0.14);
