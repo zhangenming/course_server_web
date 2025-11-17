@@ -2,7 +2,7 @@
 import NextCas from '@nextcas/sdk'
 import { Record } from '@nextcas/voice'
 
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, onBeforeUnmount } from 'vue'
 import { createAccessToken } from './token'
 import { simulateClick } from './utils'
 import { replys, spks } from './config'
@@ -457,6 +457,20 @@ if(!text)return
   isListening.value = false
 }
 
+const viewportW = ref(window.innerWidth)
+const viewportH = ref(window.innerHeight)
+const onResizeViewport = () => {
+  viewportW.value = window.innerWidth
+  viewportH.value = window.innerHeight
+}
+const isBaseline = computed(() => viewportW.value === 2160 && viewportH.value === 3840)
+onMounted(() => {
+  window.addEventListener('resize', onResizeViewport)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResizeViewport)
+})
+
 const normalizeUrl = (s: any) => {
   try {
     return String(s ?? '')
@@ -751,14 +765,17 @@ const appBgUrl = appBg as any as string
 
 .page {
   display: grid;
-  grid-template-columns: var(--leftWidth) 1fr;
-  gap: clamp(16px, 4vw, 32px);
-  max-width: 1280px;
+  grid-template-columns: 720px 1fr;
+  gap: 40px;
+  width: 2160px;
+  height: 3840px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 48px;
+  border-radius: 32px;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
-  --leftWidth: 340px;
+  box-shadow: 0 28px 64px rgba(17, 24, 39, 0.35);
 }
 
 .left {
@@ -769,28 +786,28 @@ const appBgUrl = appBg as any as string
 
 .right {
   position: relative;
-  min-width: clamp(560px, 48vw, 980px);
+  min-width: 1200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80vh;
+  min-height: 3200px;
 }
 #container {
   position: fixed;
-  left: 15%;
-  bottom: 15%;
-  width: clamp(260px, 22vw, 360px);
-  height: clamp(46vh, 56vh, 64vh);
+  left: 120px;
+  bottom: 420px;
+  width: 680px;
+  height: 1800px;
   z-index: 1;
 }
 
 .ground-shadow {
   position: fixed;
-  left: 26px;
-  bottom: 14px;
-  width: clamp(220px, 20vw, 320px);
-  height: 18px;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 42%, rgba(0,0,0,0) 72%);
+  left: 160px;
+  bottom: 360px;
+  width: 640px;
+  height: 22px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.15) 42%, rgba(0,0,0,0) 72%);
   border-radius: 9999px;
   pointer-events: none;
   z-index: 0;
@@ -1693,3 +1710,28 @@ const appBgUrl = appBg as any as string
   -webkit-backdrop-filter: saturate(160%) blur(6px);
 }
 </style>
+<style>
+:root {
+  --vw-base: 2160px;
+  --vh-base: 3840px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-outer: 0 16px 36px rgba(17, 24, 39, 0.18);
+  --shadow-soft: 0 8px 20px rgba(17, 24, 39, 0.12);
+  --primary: #8b5cf6;
+  --primary-dark: #7c3aed;
+}
+html, body, #app { width: 100%; height: 100%; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; }
+</style>
+.unsupported {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  z-index: 2000;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
