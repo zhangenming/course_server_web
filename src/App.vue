@@ -5,7 +5,7 @@ import { Record } from '@nextcas/voice'
 import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
 import { simulateClick } from './utils'
-import { replys, spks } from './config'
+import { replys, spks, asks } from './config'
 import { apiJson, apiFetch } from '@/utils/request'
 import appBg from '@/assets/bg.jpg'
 
@@ -81,7 +81,7 @@ const videos = ref<any[]>([])
 const openVideoList = async () => {
   showSurveyThemeSelect.value = false
   showVideoList.value = true
-  cas.speak('请选择一个课程视频')
+  cas.speak(spks.chooseVideo)
   enterIconUI()
   try {
     const data = await apiJson('vite/api/v1/courses/simple')
@@ -195,7 +195,7 @@ const openSurveyPicker = () => {
   showVideoList.value = false
   showSurveyThemeSelect.value = true
   selectedSurveyId.value = null
-  cas.speak('请选择一个试卷吧')
+  cas.speak(spks.chooseSurvey)
   enterIconUI()
   loadSurveys()
 }
@@ -243,7 +243,7 @@ const 课程data = [
 ]
 // 开始答题
 const startSurvey = () => {
-  cas.speak('好的，接下来请先选择需要体验的课程')
+  cas.speak(spks.startSurveyTip)
   showBegin.value = false
   showCourseSelect.value = true
   selectedCourse.value = null
@@ -262,13 +262,13 @@ const chooseCourse = (course: { id: number; title: string; description: string |
 const onVideoEnded = () => {
   playingVideo.value = false
   showSurveyThemeSelect.value = true
-  cas.speak('请选择一个试卷吧')
+  cas.speak(spks.chooseSurvey)
   loadSurveys()
 }
 const closeVideo = () => {
   playingVideo.value = false
   showSurveyThemeSelect.value = true
-  cas.speak('请选择一个试卷吧')
+  cas.speak(spks.chooseSurvey)
   loadSurveys()
 }
 const onVideoError = () => {
@@ -340,7 +340,7 @@ const nextQuestion = () => {
     try {
       const grade = getGrade(totalScore.value as any)
       const label = (grade as any)?.label || '未知'
-      cas.speak(`测评完成，您的结果为：${label}`)
+      cas.speak(spks.result(label))
     } catch {}
   } else {
     currentQuestionIndex.value++
@@ -430,7 +430,7 @@ onMounted(async () => {
     }
 
     if (content === replys.请问您是否坐好了.是) {
-      cas.ask('香薰模式1')
+      cas.ask(asks.fragrance1)
       playFirstMusic()
     }
 
@@ -462,8 +462,9 @@ const onTouchEnd = () => {
       
       console.log('语音识别结果', text)
       if(!text) return
-      
-      if(text ==='体验课程'){
+      const t = String(text).trim().toLowerCase().replace(/[，。！？、,.!\-\s]/g,'')
+      const intents = ['体验课程','体验课','开始课程','开始体验课程']
+      if (intents.some(k => t.includes(k))){
         startSurvey()
         return
       }
@@ -515,7 +516,7 @@ const appBgUrl = appBg as any as string
     </div>
 
     <div class="right">
-      <transition name="fade-scale"
+      <!-- <transition name="fade-scale"
         ><div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay begin-overlay">
           <div class="begin-modal">
             <div class="begin-title">hi~我是抱抱，芳香教室专属助理，请问您是来</div>
@@ -526,7 +527,7 @@ const appBgUrl = appBg as any as string
             </div>
           </div>
         </div></transition
-      >
+      > -->
 
       <transition name="fade-scale"
         ><div v-if="showCourseSelect" class="modal-overlay">
@@ -672,14 +673,13 @@ const appBgUrl = appBg as any as string
     aria-label="按住说话"
   >
     <span class="voice-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="18" height="18">
+      <svg viewBox="0 0 24 24" width="26" height="26">
         <rect x="9" y="4" width="6" height="10" rx="3" fill="currentColor" />
-        <path d="M5 11a7 7 0 0014 0" fill="none" stroke="#fff" stroke-width="1.6" />
-        <path d="M12 18v3" fill="none" stroke="#fff" stroke-width="1.6" />
-        <path d="M8 21h8" fill="none" stroke="#fff" stroke-width="1.6" />
+        <path d="M5 11a7 7 0 0014 0" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M12 18v3" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M8 21h8" fill="none" stroke="currentColor" stroke-width="1.6" />
       </svg>
     </span>
-    <span class="voice-text">按住说话</span>
   </el-button>
   <transition name="fade-out"><div v-show="!hasModal" class="left-fab">
     <button class="fab-btn" title="课程列表" @click="openVideoList">
@@ -795,7 +795,7 @@ const appBgUrl = appBg as any as string
   position: fixed;
   left: 15%;
   bottom: 15%;
-  width: clamp(260px, 22vw, 360px);
+  width: 500px;
   height: clamp(46vh, 56vh, 64vh);
   z-index: 1;
 }
@@ -1382,20 +1382,32 @@ const appBgUrl = appBg as any as string
   bottom: 24px;
   transform: translateX(-50%);
   z-index: 1100;
-  background: #3b82f6;
-  color: #fff;
-  border: none;
+  background: linear-gradient(#ffffffcc, #ffffffcc) padding-box,
+    linear-gradient(180deg, rgba(167,139,250,0.9), rgba(96,165,250,0.9)) border-box;
+  color: var(--primary);
+  border: 2px solid transparent;
   border-radius: 9999px;
-  padding: 12px 18px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  width: 100px;
+  height: 100px;
+  padding: 0;
+  box-shadow: 0 10px 26px rgba(124, 58, 237, 0.22);
   cursor: pointer;
   overflow: visible;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  position: relative;
 }
-.voice-button:hover {
-  background: #2563eb;
+.voice-button:hover { box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3); transform: translateX(-50%) scale(1.02); }
+.voice-button:active { transform: translateX(-50%) scale(0.98); }
+.voice-icon svg { color: #1f2937; }
+.voice-button::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(124,58,237,0.18), rgba(124,58,237,0) 70%);
+  z-index: -1;
 }
 .voice-button:active {
   transform: translateX(-50%) scale(0.98);
@@ -1425,7 +1437,7 @@ const appBgUrl = appBg as any as string
 }
 }
 
-.voice-icon { display: blockx; align-items: center; justify-content: center;padding-right: 5px; }
+.voice-icon { display: inline-flex; align-items: center; justify-content: center; }
 .fade-scale-enter-active,
 .fade-scale-leave-active {
   transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
@@ -1685,7 +1697,7 @@ const appBgUrl = appBg as any as string
     position: fixed;
     left: 15%;
     bottom: 15%;
-    width: clamp(220px, 40vw, 280px);
+    width: 500px;
     height: clamp(40vh, 48vh, 56vh);
   }
   .ground-shadow {
