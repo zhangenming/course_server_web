@@ -81,6 +81,7 @@ const videos = ref<any[]>([])
 const openVideoList = async () => {
   showSurveyThemeSelect.value = false
   showVideoList.value = true
+  cas.speak('请选择一个课程视频')
   enterIconUI()
   try {
     const data = await apiJson('vite/api/v1/courses/simple')
@@ -194,6 +195,7 @@ const openSurveyPicker = () => {
   showVideoList.value = false
   showSurveyThemeSelect.value = true
   selectedSurveyId.value = null
+  cas.speak('请选择一个试卷吧')
   enterIconUI()
   loadSurveys()
 }
@@ -260,11 +262,13 @@ const chooseCourse = (course: { id: number; title: string; description: string |
 const onVideoEnded = () => {
   playingVideo.value = false
   showSurveyThemeSelect.value = true
+  cas.speak('请选择一个试卷吧')
   loadSurveys()
 }
 const closeVideo = () => {
   playingVideo.value = false
   showSurveyThemeSelect.value = true
+  cas.speak('请选择一个试卷吧')
   loadSurveys()
 }
 const onVideoError = () => {
@@ -333,6 +337,11 @@ const fetchSurveyDetail = async (surveyId: number) => {
 const nextQuestion = () => {
   if (isLastQuestion.value) {
     showResult.value = true
+    try {
+      const grade = getGrade(totalScore.value as any)
+      const label = (grade as any)?.label || '未知'
+      cas.speak(`测评完成，您的结果为：${label}`)
+    } catch {}
   } else {
     currentQuestionIndex.value++
   }
@@ -424,6 +433,7 @@ onMounted(async () => {
       cas.ask('香薰模式1')
       playFirstMusic()
     }
+
   })
 })
 
@@ -449,8 +459,14 @@ const onTouchEnd = () => {
   record
     .stopToText('16k_zh')
     .then(text => {
+      
       console.log('语音识别结果', text)
-if(!text)return
+      if(!text) return
+      
+      if(text ==='体验课程'){
+        startSurvey()
+        return
+      }
       cas.ask(text)
     })
     .catch(error => console.error('录音停止时出错:', error))
@@ -1032,21 +1048,22 @@ const appBgUrl = appBg as any as string
 }
 .survey-dialog {
   background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
-  padding: 20px;
-  width: clamp(520px, 60vw, 900px);
-  max-height: 80vh;
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.18);
+  padding: 24px;
+  width: clamp(560px, 38vw, 720px);
+  max-height: 72vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin: 0 auto;
 }
 .dialog-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
-  padding-bottom: 8px;
+  padding-bottom: 20px;
   border-bottom: 1px solid #e5e7eb;
 }
 .dialog-tip {
@@ -1055,12 +1072,17 @@ const appBgUrl = appBg as any as string
 }
 .dialog-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 12px;
   flex: 1;
   overflow: auto;
   padding-right: 6px;
 }
+.dialog-list { scrollbar-width: thin; scrollbar-color: #a5b4fc rgba(241,245,249,0.5); }
+.dialog-list::-webkit-scrollbar { width: 10px; }
+.dialog-list::-webkit-scrollbar-track { background: transparent; }
+.dialog-list::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(99,102,241,.35), rgba(147,197,253,.35)); border-radius: 8px; border: 2px solid rgba(255,255,255,.5); }
+.dialog-list::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(99,102,241,.55), rgba(147,197,253,.55)); }
 .dialog-item {
   display: inline-flex;
   align-items: center;
@@ -1089,13 +1111,14 @@ const appBgUrl = appBg as any as string
 
 /* 答题界面样式 */
 .survey-container {
-  max-width: 900px;
-  width: clamp(560px, 52vw, 900px);
-  margin: 24px auto;
-  padding: 28px;
+  width: clamp(520px, 36vw, 680px);
+  margin: 32px auto;
+  padding: 24px;
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  max-height: 72vh;
+  overflow: auto;
 }
 
 .survey-header {
@@ -1225,8 +1248,8 @@ const appBgUrl = appBg as any as string
 
 /* 结果界面样式 */
 .result-container {
-  width: clamp(320px, 52vw, 560px);
-  margin: 20px auto;
+  width: clamp(520px, 36vw, 680px);
+  margin: 24px auto;
   padding: 20px;
 }
 
@@ -1681,7 +1704,8 @@ const appBgUrl = appBg as any as string
     padding-top: clamp(24px, 10vh, 80px);
   }
   .result-container {
-    width: 92vw;
+    width: clamp(520px, 36vw, 640px);
+    margin: 0 auto;
   }
   .modal-overlay {
     align-items: flex-start;
