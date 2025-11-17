@@ -113,6 +113,10 @@ const statsSurvey = ref<number[]>([])
 
 const chartRef = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
+const usersChartRef = ref<HTMLDivElement | null>(null)
+let usersChart: echarts.ECharts | null = null
+const studentCount = ref(0)
+const teacherCount = ref(0)
 const initChart = () => {
   if (!chartRef.value) return
   chart = echarts.init(chartRef.value)
@@ -135,7 +139,7 @@ const initChart = () => {
       {
         type: 'bar',
         data: statsLearning.value,
-        itemStyle: { color: '#8b5cf6' },
+        itemStyle: { color: '#8b5cf6', borderRadius: [19, 19, 0, 0] },
         barWidth: '40%',
       },
       {
@@ -152,7 +156,7 @@ const initChart = () => {
   chart.setOption(option)
 }
 
-const resize = () => chart?.resize()
+const resize = () => { chart?.resize(); usersChart?.resize() }
 
 onMounted(() => {
   initChart()
@@ -160,12 +164,15 @@ onMounted(() => {
   loadMe()
   loadStats()
   loadCourseStatus()
+  loadUserCounts()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
   chart?.dispose()
   chart = null
+  usersChart?.dispose()
+  usersChart = null
 })
 
 const completionPercent = computed(() => 0)
@@ -218,11 +225,34 @@ const loadStats = async () => {
       chart.setOption({
         xAxis: { data: statsDates.value },
         series: [
-          { type: 'bar', data: statsLearning.value, itemStyle: { color: '#8b5cf6' }, barWidth: '40%' },
+          { type: 'bar', data: statsLearning.value, itemStyle: { color: '#8b5cf6', borderRadius: [19, 19, 0, 0] }, barWidth: '40%' },
           { type: 'line', data: statsSurvey.value, smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' } },
         ],
       })
     }
+  } catch {}
+}
+const initUsersChart = () => {
+  if (!usersChartRef.value) return
+  if (!usersChart) usersChart = echarts.init(usersChartRef.value)
+  const option: echarts.EChartsOption = {
+    grid: { left: 24, right: 24, top: 16, bottom: 16 },
+    xAxis: { type: 'category', data: ['学生', '老师'], axisLine: { lineStyle: { color: '#e5e7eb' } }, axisTick: { show: false }, axisLabel: { color: '#6b7280' } },
+    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#eef2f7' } }, axisLabel: { color: '#6b7280' }, min: 0 },
+    tooltip: { trigger: 'axis' },
+    series: [
+      { type: 'bar', data: [studentCount.value, teacherCount.value], itemStyle: { color: '#8b5cf6', borderRadius: [19, 19, 0, 0] }, barWidth: '40%' },
+    ],
+  }
+  usersChart.setOption(option)
+}
+const loadUserCounts = async () => {
+  try {
+    const s = await apiJson('api/v1/users/list', { role: 'student' })
+    const t = await apiJson('api/v1/users/list', { role: 'teacher' })
+    studentCount.value = Array.isArray(s) ? s.length : 0
+    teacherCount.value = Array.isArray(t) ? t.length : 0
+    initUsersChart()
   } catch {}
 }
 const statusLabel = (s: string) => {
@@ -313,6 +343,11 @@ const statusLabel = (s: string) => {
             <div class="profile-row"><span class="label">注册日期</span><span class="value">{{ fmtDate((me as any).registered_at) }}</span></div>
           </div>
         </div>
+        </div>
+
+        <div class="card users-stats">
+          <div class="stats-title">人员统计</div>
+          <div class="stats-chart" ref="usersChartRef"></div>
         </div>
 
         <div class="card quick-actions">
@@ -418,7 +453,12 @@ input[type='text'] { height: 36px; padding: 0 12px; border: 1px solid #e5e7eb; b
 .bar-wrap { height: 10px; background: #f1f5f9; border-radius: 9999px; overflow: hidden; }
 .bar-wrap .bar { height: 100%; border-radius: 9999px; }
 
-.quick-actions { padding: 14px 16px; display: grid; gap: 8px; }
+.users-stats { padding: 14px 16px; }
+.stats-title { color: #374151; margin-bottom: 8px; }
+.stats-chart { height: 160px; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px #eef2f7; }
+
+.quick-actions { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; justify-content: center; align-items: center; }
+.quick-actions :deep(.el-button) { width: 100%; height: 36px; border-radius: 10px; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
 .create-modal { background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; max-width: 520px; width: 100%; }
