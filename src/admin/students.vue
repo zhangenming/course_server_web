@@ -197,7 +197,7 @@ const avatarInitial = computed(() => {
   if (!raw) return ''
   const first = raw[0]
   try {
-    return first.toUpperCase()
+    return first ? first.toUpperCase() : ''
   } catch {
     return first
   }
