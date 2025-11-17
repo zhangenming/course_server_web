@@ -117,6 +117,12 @@ const usersChartRef = ref<HTMLDivElement | null>(null)
 let usersChart: echarts.ECharts | null = null
 const studentCount = ref(0)
 const teacherCount = ref(0)
+const resourcesChartRef = ref<HTMLDivElement | null>(null)
+let resourcesChart: echarts.ECharts | null = null
+const courseCount = ref(0)
+const surveyCount = ref(0)
+const videoCount = ref(0)
+const musicCount = ref(0)
 const initChart = () => {
   if (!chartRef.value) return
   chart = echarts.init(chartRef.value)
@@ -165,6 +171,7 @@ onMounted(() => {
   loadStats()
   loadCourseStatus()
   loadUserCounts()
+  loadResourceCounts()
 })
 
 onBeforeUnmount(() => {
@@ -173,6 +180,8 @@ onBeforeUnmount(() => {
   chart = null
   usersChart?.dispose()
   usersChart = null
+  resourcesChart?.dispose()
+  resourcesChart = null
 })
 
 const completionPercent = computed(() => 0)
@@ -253,6 +262,35 @@ const loadUserCounts = async () => {
     studentCount.value = Array.isArray(s) ? s.length : 0
     teacherCount.value = Array.isArray(t) ? t.length : 0
     initUsersChart()
+  } catch {}
+}
+const initResourcesChart = () => {
+  if (!resourcesChartRef.value) return
+  if (!resourcesChart) resourcesChart = echarts.init(resourcesChartRef.value)
+  const option: echarts.EChartsOption = {
+    grid: { left: 24, right: 24, top: 16, bottom: 16 },
+    xAxis: { type: 'category', data: ['课程', '问卷', '视频', '音乐'], axisLine: { lineStyle: { color: '#e5e7eb' } }, axisTick: { show: false }, axisLabel: { color: '#6b7280' } },
+    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#eef2f7' } }, axisLabel: { color: '#6b7280' }, min: 0 },
+    tooltip: { trigger: 'axis' },
+    series: [
+      { type: 'bar', data: [courseCount.value, surveyCount.value, videoCount.value, musicCount.value], itemStyle: { color: '#8b5cf6', borderRadius: [19, 19, 0, 0] }, barWidth: '40%' },
+    ],
+  }
+  resourcesChart.setOption(option)
+}
+const loadResourceCounts = async () => {
+  try {
+    const [c, s, v, m] = await Promise.all([
+      apiJson('api/v1/courses/simple'),
+      apiJson('api/v1/surveys'),
+      apiJson('api/v1/videos/'),
+      apiJson('api/v1/music/'),
+    ])
+    courseCount.value = Array.isArray(c) ? c.length : 0
+    surveyCount.value = Array.isArray(s) ? s.length : 0
+    videoCount.value = Array.isArray(v) ? v.length : 0
+    musicCount.value = Array.isArray(m) ? m.length : 0
+    initResourcesChart()
   } catch {}
 }
 const statusLabel = (s: string) => {
@@ -350,11 +388,16 @@ const statusLabel = (s: string) => {
           <div class="stats-chart" ref="usersChartRef"></div>
         </div>
 
-        <div class="card quick-actions">
+        <div class="card resources-stats">
+          <div class="stats-title">资源统计</div>
+          <div class="stats-chart" ref="resourcesChartRef"></div>
+        </div>
+
+        <!-- <div class="card quick-actions">
           <el-button type="primary">导出报告</el-button>
           <el-button>查看录像</el-button>
           <el-button type="danger">归档记录</el-button>
-        </div>
+        </div> -->
       </aside>
       <div v-if="showCreate" class="modal-overlay" @click.self="closeCreate">
         <div class="create-modal">
@@ -456,6 +499,8 @@ input[type='text'] { height: 36px; padding: 0 12px; border: 1px solid #e5e7eb; b
 .users-stats { padding: 14px 16px; }
 .stats-title { color: #374151; margin-bottom: 8px; }
 .stats-chart { height: 160px; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px #eef2f7; }
+
+.resources-stats { padding: 14px 16px; }
 
 .quick-actions { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; justify-content: center; align-items: center; }
 .quick-actions :deep(.el-button) { width: 100%; height: 36px; border-radius: 10px; }
