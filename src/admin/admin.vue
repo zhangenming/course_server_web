@@ -161,6 +161,7 @@ const logout = () => {
   background: #f8fafc;
   --primary: #8b5cf6;
   --primary-hover: #7c3aed;
+  --topbar-h: 50px;
 }
 .topbar {
   position: sticky;
@@ -188,8 +189,8 @@ const logout = () => {
   border-right: 1px solid #e5e7eb;
   padding: 16px;
   position: sticky;
-  top: 48px;
-  height: calc(100vh - 48px);
+  top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -199,7 +200,10 @@ const logout = () => {
   color: #111827;
   padding: 8px 0;
 }
-.sidebar-menu { border-right: none; }
+.sidebar-menu { border-right: none; flex: 1; overflow-y: auto; min-height: 0; padding-right: 6px; overscroll-behavior: contain; }
+.sidebar-menu::-webkit-scrollbar { width: 8px; }
+.sidebar-menu::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 8px; }
+.sidebar-menu::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
 .sidebar-menu :deep(.el-menu-item) {
   display: flex;
   align-items: center;
@@ -224,6 +228,8 @@ const logout = () => {
 .content {
   padding: 16px;
   position: relative;
+  overflow-y: auto;
+  min-height: 0;
 }
 @media (max-width: 960px) {
   .layout {

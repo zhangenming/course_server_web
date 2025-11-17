@@ -7,6 +7,7 @@ import { createAccessToken } from './token'
 import { simulateClick } from './utils'
 import { replys, spks } from './config'
 import { apiJson, apiFetch } from '@/utils/request'
+import appBg from '@/assets/bg.jpg'
 
 const showBegin = ref(false)
 const showSurvey = ref(false)
@@ -73,8 +74,125 @@ const selectedCourse = ref<{
   cover_url: string | null
 } | null>(null)
 const playingVideo = ref(false)
-const showAudioPlayer = ref(false)
-const audioSrc = ref<string | null>(null)
+const isMusicPlaying = ref(false)
+const audioEl = ref<HTMLAudioElement | null>(null)
+const TEST_VIDEO =
+  'https://xfjs-api.zkyr.net.cn/static/media/vid/9f38419bb0ff4dba.mp4'
+
+const showVideoList = ref(false)
+const videos = ref<any[]>([])
+const openVideoList = async () => {
+  showSurveyThemeSelect.value = false
+  showVideoList.value = true
+  enterIconUI()
+  try {
+    const data = await apiJson('vite/api/v1/courses/simple')
+    const arr = Array.isArray((data as any)?.data)
+      ? (data as any).data
+      : Array.isArray(data)
+      ? (data as any)
+      : []
+    videos.value = arr
+  } catch {
+    videos.value = []
+  }
+}
+const closeVideoList = () => {
+  showVideoList.value = false
+  exitIconUI()
+}
+const listPlayerSrc = ref<string | null>(null)
+const showListPlayer = ref(false)
+const closeListPlayer = () => {
+  showListPlayer.value = false
+  if (listPlayerSrc.value && listPlayerSrc.value.startsWith('blob:')) {
+    URL.revokeObjectURL(listPlayerSrc.value)
+  }
+  listPlayerSrc.value = null
+  showVideoList.value = true
+}
+const listError = ref<string | null>(null)
+let listErrTimer: number | undefined
+const notifyListError = (msg: string) => {
+  listError.value = msg
+  if (listErrTimer) clearTimeout(listErrTimer)
+  listErrTimer = window.setTimeout(() => {
+    listError.value = null
+  }, 3000)
+}
+const playVideoFromList = (v: any) => {
+  const video_url = v?.video_url
+  listPlayerSrc.value = String(video_url)
+  showVideoList.value = false
+  showListPlayer.value = true
+  enterIconUI()
+}
+const onListPlayerError = () => {
+  notifyListError('视频播放失败，请稍后重试')
+  closeListPlayer()
+}
+
+const enterIconUI = () => {
+  showBegin.value = false
+}
+const exitIconUI = () => {
+  if (
+    !showSurvey.value &&
+    !showResult.value &&
+    !playingVideo.value &&
+    !showVideoList.value &&
+    !showListPlayer.value &&
+    !showCommandMenu.value
+  ) {
+    showBegin.value = true
+  }
+}
+
+const showCommandMenu = ref(false)
+const commandList = ref<
+  Array<{ label: string; icon: string; command?: string }>
+>([
+  { label: '柔和模式', icon: '🧡', command: 'soft' },
+  { label: '香氛模式3', icon: '🪔', command: 'fragrance3' },
+  { label: '香氛模式2', icon: '🪔', command: 'fragrance2' },
+  { label: '香氛模式1', icon: '🪔', command: 'fragrance1' },
+  { label: '明亮模式', icon: '🌞', command: 'bright' },
+  { label: '下课模式', icon: '🧹', command: 'end' },
+  { label: '停止香氛', icon: '🧯', command: 'stop' },
+])
+const openCommandMenu = () => {
+  showCommandMenu.value = true
+  enterIconUI()
+}
+const closeCommandMenu = () => {
+  showCommandMenu.value = false
+  exitIconUI()
+}
+const execCommand = (cmd: {
+  label: string
+  icon: string
+  command?: string
+}) => {
+  speakCas(cmd.label)
+  showCommandMenu.value = false
+  exitIconUI()
+}
+
+const closeSurveyPick = () => {
+  showSurveyThemeSelect.value = false
+  exitIconUI()
+}
+const openSurveyPicker = () => {
+  showVideoList.value = false
+  showSurveyThemeSelect.value = true
+  selectedSurveyId.value = null
+  enterIconUI()
+  loadSurveys()
+}
+const startSurveyPick = () => {
+  const s = surveys.value.find(x => x.id === selectedSurveyId.value)
+  if (s) chooseSurveyTheme(s)
+}
 
 const 课程data = [
   {
@@ -158,10 +276,14 @@ const backToBegin = () => {
   playingVideo.value = false
   showSurvey.value = false
 }
-const closeAudio = () => {
-  showAudioPlayer.value = false
-  if (audioSrc.value && audioSrc.value.startsWith('blob:')) URL.revokeObjectURL(audioSrc.value)
-  audioSrc.value = null
+const stopMusic = () => {
+  try {
+    if (audioEl.value) {
+      audioEl.value.pause()
+      audioEl.value.src = ''
+    }
+  } catch {}
+  isMusicPlaying.value = false
 }
 const startChat = () => {
   showBegin.value = false
@@ -227,6 +349,10 @@ const restartSurvey = () => {
   userAnswers.value = []
   selectedIndex.value = []
   showResult.value = false
+}
+const closeResultModal = () => {
+  showResult.value = false
+  exitIconUI()
 }
 
 // 处理日常巡检点击
@@ -325,198 +451,237 @@ const onTouchEnd = () => {
     .catch(error => console.error('录音停止时出错:', error))
 }
 
+const normalizeUrl = (s: any) => {
+  try {
+    return String(s ?? '')
+      .trim()
+      .replace(/[`'\"]/g, '')
+  } catch {
+    return ''
+  }
+}
 const playFirstMusic = async () => {
   try {
     const data = await apiJson('api/v1/music/')
     const list = data
     const it = Array.isArray(list) ? list[0] : null
     if (!it) return
-    let src: string | null = it?.music_url || it?.music || it?.url || null
-    if (it?.id) {
-      const res = await apiFetch(`api/v1/music/${it.id}/download`)
-      if (!res.ok) return
-      const blob = await res.blob()
-      src = URL.createObjectURL(blob)
-    } else if (src) {
-      const res = await apiFetch(src)
-      if (!res.ok) return
-      const blob = await res.blob()
-      src = URL.createObjectURL(blob)
-    }
-    if (src) {
-      audioSrc.value = src
-      showAudioPlayer.value = true
+    const src = normalizeUrl(it?.url)
+    if (src && audioEl.value) {
+      audioEl.value.src = src
+      await audioEl.value.play()
+      isMusicPlaying.value = true
     }
   } catch {}
 }
+const toggleFabMusic = async () => {
+  if (isMusicPlaying.value) {
+    stopMusic()
+  } else {
+    await playFirstMusic()
+  }
+}
+const appBgUrl = appBg as any as string
 </script>
 
 <template>
+  <div class="app-bg" :style="{ backgroundImage: `url(${appBgUrl})` }"></div>
   <div class="page">
     <div class="left">
       <div id="container"></div>
     </div>
 
     <div class="right">
-      <div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay">
-        <div class="begin-modal">
-          <div class="begin-title">
-            hi~我是抱抱，芳香教室专属助理，请问您是来
+      <transition name="fade-scale"
+        ><div
+          v-if="showBegin && !showSurvey && !showResult"
+          class="modal-overlay"
+        >
+          <div class="begin-modal">
+            <div class="begin-title">
+              hi~我是抱抱，芳香教室专属助理，请问您是来
+            </div>
+            <div class="begin-actions">
+              <el-button type="primary" @click="startSurvey">
+                体验课程
+              </el-button>
+              <el-button @click="handleInspectionClick"> 日常巡检 </el-button>
+              <el-button @click="startChat"> 进行聊天 </el-button>
+            </div>
           </div>
-          <div class="begin-actions">
-            <el-button type="primary" @click="startSurvey">
-              体验课程
-            </el-button>
-            <el-button @click="handleInspectionClick">
-              日常巡检
-            </el-button>
-            <el-button @click="startChat">
-              进行聊天
-            </el-button>
-          </div>
-        </div>
-      </div>
+        </div></transition
+      >
 
-      <div v-if="showCourseSelect" class="modal-overlay">
-        <div class="course-modal">
-          <div class="course-modal-header">
-            <h2>请选择体验的课程</h2>
-            <el-button @click="backToBegin">
-              返回上一步
-            </el-button>
-          </div>
-          <div class="course-list">
-            <div
-              class="course-card"
-              :class="{ disabled: !course.video_url }"
-              v-for="course in 课程data"
-              :key="course.id"
-              @click="chooseCourse(course)"
-            >
-              <div class="cover" v-if="course.cover_url">
-                <img :src="course.cover_url" alt="cover" />
-              </div>
-              <div class="info">
-                <div class="title">{{ course.title }}</div>
-                <div class="desc">{{ course.description || '暂无描述' }}</div>
-                <div class="tip" v-if="!course.video_url">
-                  无视频，暂不可体验
+      <transition name="fade-scale"
+        ><div v-if="showCourseSelect" class="modal-overlay">
+          <div class="course-modal">
+            <div class="course-modal-header">
+              <h2>请选择体验的课程</h2>
+              <el-button @click="backToBegin"> 返回上一步 </el-button>
+            </div>
+            <div class="course-list">
+              <div
+                class="course-card"
+                :class="{ disabled: !course.video_url }"
+                v-for="course in 课程data"
+                :key="course.id"
+                @click="chooseCourse(course)"
+              >
+                <div class="cover" v-if="course.cover_url">
+                  <img :src="course.cover_url" alt="cover" />
+                </div>
+                <div class="info">
+                  <div class="title">{{ course.title }}</div>
+                  <div class="desc">{{ course.description || '暂无描述' }}</div>
+                  <div class="tip" v-if="!course.video_url">
+                    无视频，暂不可体验
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div></transition
+      >
 
-      <div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
-        <div class="video-modal">
-          <el-button
-            class="video-close"
-            @click="closeVideo"
-            aria-label="关闭视频"
-            title="关闭"
-          >
-            ×
-          </el-button>
-          <video
-            :key="selectedCourse.id"
-            :src="selectedCourse.video_url!"
-            controls
-            autoplay
-            muted
-            playsinline
-            preload="metadata"
-            @ended="onVideoEnded"
-            @error="onVideoError"
-          ></video>
-        </div>
-      </div>
-
-      <div v-if="showAudioPlayer" class="audio-bar">
-        <el-button
-          class="modal-close"
-          @click="closeAudio"
-          aria-label="关闭"
-          title="关闭"
+      <transition name="fade-scale"
+        ><div
+          v-if="playingVideo && selectedCourse"
+          class="modal-overlay"
+          @click.self="closeVideo"
         >
-          ×
-        </el-button>
-        <audio :src="audioSrc!" controls autoplay></audio>
-      </div>
-
-      <div v-if="showSurveyThemeSelect" class="modal-overlay">
-        <div class="course-modal">
-          <div class="course-modal-header">
-            <h2>请选择问卷主题</h2>
-          </div>
-          <div class="survey-list">
-            <div
-              class="survey-item"
-              v-for="s in surveys"
-              :key="s.id"
-              @click="chooseSurveyTheme(s)"
+          <div class="video-modal">
+            <el-button
+              class="video-close"
+              @click="closeVideo"
+              aria-label="关闭视频"
+              title="关闭"
             >
-              <div class="survey-title">{{ s.theme || '未命名问卷' }}</div>
+              ×
+            </el-button>
+            <video
+              :key="selectedCourse.id"
+              :src="selectedCourse.video_url!"
+              controls
+              autoplay
+              muted
+              playsinline
+              preload="metadata"
+              @ended="onVideoEnded"
+              @error="onVideoError"
+            ></video>
+          </div></div
+      ></transition>
+
+      <audio
+        ref="audioEl"
+        style="display: none"
+        @ended="isMusicPlaying = false"
+        @error="isMusicPlaying = false"
+      ></audio>
+
+      <transition name="fade-scale"
+        ><div
+          v-if="showSurveyThemeSelect"
+          class="modal-overlay top-overlay survey-overlay"
+          @click.self="closeSurveyPick"
+        >
+          <div class="survey-dialog">
+            <div class="dialog-header">
+              <h3>测评</h3>
+              <el-button @click="closeSurveyPick">关闭</el-button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="showSurvey && !showResult" class="modal-overlay">
-        <div class="survey-container">
-          <div class="survey-header">
-            <h2>问卷答题</h2>
-            <div class="progress">
-              题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
-            </div>
-          </div>
-
-          <div class="question-card">
-            <h3>{{ currentQuestion.text }}</h3>
-
-            <div class="options">
-              <div
-                v-for="(option, index) in currentQuestion.options"
-                :key="index"
-                class="option"
-                :class="{
-                  selected: selectedIndex[currentQuestionIndex] === index,
-                }"
-                @click="selectAnswer(index, option.value)"
+            <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
+            <div class="dialog-list">
+              <button
+                class="dialog-item"
+                :class="{ selected: selectedSurveyId === s.id }"
+                v-for="s in surveys"
+                :key="s.id"
+                @click="selectedSurveyId = s.id"
               >
-                <span class="option-label">{{
-                  String.fromCharCode(65 + index)
-                }}</span>
-                <span class="option-text">{{ option.text }}</span>
-                <span class="option-value">{{ option.value }}分</span>
+                <span class="item-text">{{ s.theme || '未命名问卷' }}</span>
+              </button>
+            </div>
+            <div class="dialog-actions">
+              <el-button
+                type="primary"
+                :disabled="!selectedSurveyId"
+                @click="startSurveyPick"
+                >开始测评</el-button
+              >
+            </div>
+          </div>
+        </div></transition
+      >
+
+      <transition name="fade-scale"
+        ><div v-if="showSurvey && !showResult" class="modal-overlay">
+          <div class="survey-container">
+            <div class="survey-header">
+              <h2>问卷答题</h2>
+              <div class="progress">
+                题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
               </div>
             </div>
 
-            <div class="navigation">
-              <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
+            <div class="question-card">
+              <h3>{{ currentQuestion.text }}</h3>
 
-              <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{ isLastQuestion ? '提交' : '下一题' }}</el-button>
+              <div class="options">
+                <div
+                  v-for="(option, index) in currentQuestion.options"
+                  :key="index"
+                  class="option"
+                  :class="{
+                    selected: selectedIndex[currentQuestionIndex] === index,
+                  }"
+                  @click="selectAnswer(index, option.value)"
+                >
+                  <span class="option-label">{{
+                    String.fromCharCode(65 + index)
+                  }}</span>
+                  <span class="option-text">{{ option.text }}</span>
+                  <span class="option-value">{{ option.value }}分</span>
+                </div>
+              </div>
+
+              <div class="navigation">
+                <el-button
+                  @click="prevQuestion"
+                  :disabled="currentQuestionIndex === 0"
+                  >上一题</el-button
+                >
+
+                <el-button
+                  type="primary"
+                  @click="nextQuestion"
+                  :disabled="selectedIndex[currentQuestionIndex] === undefined"
+                  >{{ isLastQuestion ? '提交' : '下一题' }}</el-button
+                >
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div></transition
+      >
 
-      <div v-if="showResult" class="result-container">
-        <div class="result-card">
-          <div class="result-summary">
-            <span class="result-prefix">根据您的情况</span>
-            <span class="grade-badge">{{
-              getGrade(totalScore)?.label || ''
-            }}</span>
+      <transition name="fade-scale"
+        ><div v-if="showResult" class="result-container">
+          <div class="result-card">
+            <div class="result-summary">
+              <span class="result-prefix">根据您的情况</span>
+              <span class="grade-badge">{{
+                getGrade(totalScore)?.label || ''
+              }}</span>
+            </div>
+              <div class="result-actions">
+                <el-button type="primary" @click="restartSurvey">
+                  重新评测
+                </el-button>
+                <el-button type="primary" @click="closeResultModal">继续</el-button>
+              </div>
           </div>
-          <div class="result-actions">
-            <el-button type="primary" @click="restartSurvey">
-              重新评测
-            </el-button>
-            <el-button type="primary" @click="handleJsx">继续</el-button>
-          </div>
-        </div>
-      </div>
+        </div></transition
+      >
     </div>
   </div>
   <el-button
@@ -530,6 +695,145 @@ const playFirstMusic = async () => {
   >
     按住说话
   </el-button>
+  <div class="left-fab">
+    <button class="fab-btn" title="课程列表" @click="openVideoList">
+      <svg viewBox="0 0 24 24" width="22" height="22">
+        <rect
+          x="5"
+          y="7"
+          width="14"
+          height="10"
+          rx="2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+        <path d="M10 9l6 3-6 3V9" fill="currentColor" />
+      </svg>
+    </button>
+    <button class="fab-btn" title="命令模式" @click="openCommandMenu">
+      <svg viewBox="0 0 24 24" width="24" height="24">
+        <path d="M4 12h16" stroke="currentColor" stroke-width="2" fill="none" />
+        <circle cx="12" cy="12" r="5" fill="currentColor" opacity="0.25" />
+        <path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="1.6" />
+      </svg>
+    </button>
+
+    <button
+      class="fab-btn"
+      :title="isMusicPlaying ? '停止音乐' : '播放音乐'"
+      @click="toggleFabMusic"
+    >
+      <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+        <path d="M10 8l6 4-6 4V8" fill="currentColor" />
+      </svg>
+      <svg v-else viewBox="0 0 24 24" width="24" height="24">
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+        <rect x="8" y="7" width="3" height="10" fill="currentColor" />
+        <rect x="13" y="7" width="3" height="10" fill="currentColor" />
+      </svg>
+    </button>
+    <button class="fab-btn" title="测评选择" @click="openSurveyPicker">
+      <svg viewBox="0 0 24 24" width="22" height="22">
+        <rect x="6" y="5" width="12" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M9 9h6" stroke="currentColor" stroke-width="1.6" />
+        <path d="M9 13h6" stroke="currentColor" stroke-width="1.6" />
+        <path d="M9 17h6" stroke="currentColor" stroke-width="1.6" />
+      </svg>
+    </button>
+  </div>
+  <transition name="fade-scale"
+    ><div
+      v-if="showVideoList"
+      class="modal-overlay top-overlay"
+      @click.self="closeVideoList"
+    >
+      <div class="video-list-modal">
+        <div class="video-list-header">
+          <h2>课程列表</h2>
+          <el-button @click="closeVideoList">关闭</el-button>
+        </div>
+        <div class="video-grid">
+          <div
+            class="video-item"
+            v-for="v in videos"
+            :key="v.id"
+            @click="playVideoFromList(v)"
+          >
+            <div class="thumb">
+              <img :src="v.i_url || v.cover_url || ''" alt="thumbnail" />
+            </div>
+            <div class="meta">
+              <div class="name">{{ v.name || v.title || '未命名' }}</div>
+              <div class="desc">{{ v.description || '' }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></transition
+  >
+  <transition name="fade-scale"
+    ><div
+      v-if="showCommandMenu"
+      class="cmd-overlay"
+      @click.self="closeCommandMenu"
+    >
+      <div class="cmd-menu">
+        <div
+          class="cmd-item"
+          v-for="(c, i) in commandList"
+          :key="i"
+          @click="execCommand(c)"
+        >
+          <span class="cmd-icon">{{ c.icon }}</span>
+          <span class="cmd-label">{{ c.label }}</span>
+        </div>
+      </div>
+    </div></transition
+  >
+  <div v-if="listError" class="banner" role="alert" @click="listError = null">
+    {{ listError }}
+  </div>
+  <transition name="fade-scale"
+    ><div
+      v-if="showListPlayer && listPlayerSrc"
+      class="modal-overlay"
+      @click.self="closeListPlayer"
+    >
+      <div class="video-modal">
+        <el-button
+          class="video-close"
+          @click="closeListPlayer"
+          aria-label="关闭视频"
+          title="关闭"
+          >×</el-button
+        >
+        <video
+          :src="listPlayerSrc!"
+          controls
+          autoplay
+          playsinline
+          preload="metadata"
+          @ended="closeListPlayer"
+          @error="onListPlayerError"
+        ></video>
+      </div></div
+  ></transition>
 </template>
 
 <style scoped>
@@ -559,11 +863,11 @@ const playFirstMusic = async () => {
 
 .right {
   position: relative;
-  min-width: 600px;
+  min-width: clamp(560px, 48vw, 980px);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: min(60vh, calc(var(--leftWidth) * 1.1));
+  min-height: 80vh;
 }
 #container {
   width: 100%;
@@ -603,8 +907,14 @@ const playFirstMusic = async () => {
   flex-wrap: wrap;
 }
 
-.begin-actions :deep(.el-button) { padding: 12px 18px; border-radius: 10px; min-width: 140px; }
-.begin-actions :deep(.el-button--primary) { box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35); }
+.begin-actions :deep(.el-button) {
+  padding: 12px 18px;
+  border-radius: 10px;
+  min-width: 140px;
+}
+.begin-actions :deep(.el-button--primary) {
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
+}
 
 .course-modal {
   background: #fff;
@@ -700,7 +1010,7 @@ const playFirstMusic = async () => {
   border-radius: 12px;
   padding: 12px;
   max-width: 1000px;
-  width: 92vw;
+  width: clamp(560px, 60vw, 1000px);
   position: relative;
   overflow: hidden;
 }
@@ -744,18 +1054,8 @@ const playFirstMusic = async () => {
 }
 
 .audio-bar {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 12px 16px;
-  z-index: 1100;
 }
 .audio-bar audio {
-  width: clamp(280px, 56vw, 560px);
 }
 .modal-close {
   position: absolute;
@@ -785,10 +1085,84 @@ const playFirstMusic = async () => {
   padding-top: 12px;
 }
 
+.survey-overlay {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: saturate(130%) blur(1.5px);
+  -webkit-backdrop-filter: saturate(130%) blur(1.5px);
+}
+
+.picker-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1400;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: saturate(130%) blur(1.5px);
+}
+.survey-dialog {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+  width: clamp(520px, 60vw, 900px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.dialog-tip {
+  margin: 8px 0 12px;
+  color: #64748b;
+}
+.dialog-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  flex: 1;
+  overflow: auto;
+  padding-right: 6px;
+}
+.dialog-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+.dialog-item:hover {
+  border-color: #3b82f6;
+  background: #f0f6ff;
+}
+.dialog-item.selected {
+  border-color: #3b82f6;
+  background: #eef2ff;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 /* 答题界面样式 */
 .survey-container {
   max-width: 900px;
-  width: 90vw;
+  width: clamp(560px, 52vw, 900px);
   margin: 24px auto;
   padding: 28px;
   background: #fff;
@@ -884,8 +1258,10 @@ const playFirstMusic = async () => {
   margin-top: 20px;
 }
 
-.survey-container :deep(.el-button) { padding: 12px 22px; font-size: 16px; }
-
+.survey-container :deep(.el-button) {
+  padding: 12px 22px;
+  font-size: 16px;
+}
 
 /* 结果界面样式 */
 .result-container {
@@ -975,16 +1351,16 @@ const playFirstMusic = async () => {
 }
 
 .modal-overlay {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  position: fixed;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 1000;
+  z-index: 1400;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: saturate(130%) blur(1.5px);
+  -webkit-backdrop-filter: saturate(130%) blur(1.5px);
 }
 
 .result-summary {
@@ -1037,6 +1413,225 @@ const playFirstMusic = async () => {
 .voice-button:active {
   transform: scale(0.98);
 }
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+}
+.fade-scale-enter-from,
+.fade-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.98) translateY(8px);
+  filter: blur(1px);
+}
+.fade-down-enter-active,
+.fade-down-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.fade-down-enter-from,
+.fade-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.cmd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 96px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: saturate(130%) blur(1.5px);
+}
+.cmd-menu {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: saturate(180%) blur(10px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.18);
+  width: clamp(220px, 24vw, 300px);
+  overflow: hidden;
+}
+.cmd-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+  cursor: pointer;
+}
+.cmd-item:last-child {
+  border-bottom: none;
+}
+.cmd-item:hover {
+  background: #f8fafc;
+}
+.cmd-icon {
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+}
+.cmd-label {
+  font-weight: 600;
+  color: #111827;
+}
+.app-bg {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+.page,
+.left-fab,
+.banner {
+  position: relative;
+  z-index: 1;
+}
+.banner {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ef4444;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1200;
+}
+.left-fab {
+  position: fixed;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 1100;
+}
+.fab-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  backdrop-filter: saturate(160%) blur(2px);
+}
+.fab-btn svg {
+  width: 26px;
+  height: 26px;
+}
+.fab-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  filter: brightness(1.05);
+}
+.fab-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+.video-list-modal {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(180%) blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.18);
+  padding: 18px;
+  width: clamp(560px, 64vw, 980px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.video-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+.video-list-header h2 {
+  margin: 0;
+  font-weight: 700;
+  color: #111827;
+}
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  flex: 1;
+  overflow: auto;
+  padding-right: 6px;
+}
+.video-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fafafa;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: stretch;
+  min-height: 110px;
+  transition: transform 0.16s ease, box-shadow 0.16s ease,
+    border-color 0.16s ease;
+}
+.video-item:hover {
+  transform: translateY(-2px);
+  border-color: #a78bfa;
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.15);
+}
+.video-item.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.video-item .thumb {
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.video-item .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.video-item .meta {
+  padding: 12px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.video-item .name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.video-item .desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 @media (max-width: 480px) {
   .result-summary {
     gap: 8px;
@@ -1072,5 +1667,11 @@ const playFirstMusic = async () => {
   .modal-overlay {
     align-items: flex-start;
   }
+}
+
+.survey-overlay {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: saturate(160%) blur(6px);
+  -webkit-backdrop-filter: saturate(160%) blur(6px);
 }
 </style>
