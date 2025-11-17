@@ -478,7 +478,21 @@ onMounted(async () => {
     actorId: 'actor_118544',
     model: '16k_zh'
   })
+		AsrTTS.on("ready", () => console.log("ASR 准备就绪"));
+		AsrTTS.on("sentenceBegin", () => {
+			// 停止对话
+			// cas.stopAct()
+			console.log("ASR 开始识别")
+		});
+		AsrTTS.on("sentenceEnd", (data) => {
+			console.log("一句话识别结束", data);
+			if (AsrTTS) {
+				cas.stopAct()
+				cas.ask(data);
+			}
+		});
 
+    
 
   cas = new NextCas(document.getElementById('container')!, {
     token,
@@ -510,8 +524,15 @@ onMounted(async () => {
     }
 
     if (content === replys.请问您是否坐好了.是) {
-      cas.ask(asks.fragrance1)
-      playFirstMusic()
+      cas.speak
+        (replys.请问您是否坐好了.是, {
+          onEnd() {
+            setTimeout(() => {
+              cas.ask(asks.fragrance1)
+              playFirstMusic()
+            }, 200);
+          }
+        })
     }
 
   })
@@ -542,6 +563,7 @@ const onTouchEnd = () => {
 
       console.log('语音识别结果', text)
       if (!text) return
+
       const t = String(text).trim().toLowerCase().replace(/[，。！？、,.!\-\s]/g, '')
       const intents = ['体验课程', '体验课', '开始课程', '开始体验课程']
       if (intents.some(k => t.includes(k))) {
@@ -549,8 +571,7 @@ const onTouchEnd = () => {
         return
       }
 
-      // 聊天
-      if (t === '聊天') {
+      if ( ['聊天','对话'].includes(t)) {
         AsrTTS.start();
         return
       }
@@ -1494,7 +1515,6 @@ const appBgUrl = appBg as any as string
 }
 
 .voice-button {
-  position: fixed;
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
@@ -1513,7 +1533,7 @@ const appBgUrl = appBg as any as string
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  position: fixed;
 }
 
 .voice-button:hover {
