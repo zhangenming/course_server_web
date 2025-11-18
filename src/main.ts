@@ -41,7 +41,13 @@ declare global {
       if (url.pathname.startsWith('/admin')) url.pathname = '/'
       history.replaceState(null, '', url)
     }
-    const app = createApp(window.e ? App : Admin)
+    const app = createApp(
+      (() => {
+        if (params.has('admin')) return Admin
+        if (params.has('app')) return App
+        return window.e ? App : Admin
+      })()
+    )
     app.use(ElementPlus, { locale: zhCn })
     app.mount('#app')
     if (shouldMountAdmin) document.body.classList.add('admin-mode')
