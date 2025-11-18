@@ -1,3 +1,5 @@
+import NextCas from '@nextcas/sdk'
+import { createAccessToken } from './token'
 import './assets/main.css'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
@@ -11,21 +13,24 @@ import { apiJson } from '@/utils/request'
 
 declare global {
   interface Window {
-    token?: string;
-    id?: number;
-    _redirectingToLogin?: boolean;
+    token?: string
+    id?: number
+    _redirectingToLogin?: boolean
   }
 }
-(async()=>{
+;(async () => {
   if (localStorage.token) {
     ;(window as any).token = localStorage.token
     const params = new URLSearchParams(location.search)
-    const wantsAdmin = params.has('admin') || location.pathname.startsWith('/admin')
+    const wantsAdmin =
+      params.has('admin') || location.pathname.startsWith('/admin')
     let me: any = null
     try {
-      me = await apiJson('api/v1/users/me') as any
+      me = (await apiJson('api/v1/users/me')) as any
     } catch {}
-    const isAdminUser = !!(me && (String(me.role || '').toLowerCase() === 'admin'))
+    const isAdminUser = !!(
+      me && String(me.role || '').toLowerCase() === 'admin'
+    )
     if (isAdminUser && me && typeof me.user_id === 'number') {
       window.id = me.user_id
     }
@@ -36,7 +41,7 @@ declare global {
       if (url.pathname.startsWith('/admin')) url.pathname = '/'
       history.replaceState(null, '', url)
     }
-    const app = createApp(shouldMountAdmin ? Admin : App)
+    const app = createApp(window.e ? App : Admin)
     app.use(ElementPlus, { locale: zhCn })
     app.mount('#app')
     if (shouldMountAdmin) document.body.classList.add('admin-mode')
@@ -48,3 +53,12 @@ declare global {
     document.body.classList.remove('admin-mode')
   }
 })()
+
+// const token = await createAccessToken()
+// document.getElementById('app').style.height = '50px'
+// new NextCas(document.getElementById('app')!, {
+//   token,
+//   templateName: 'base',
+//   avatarId: 'avatar_482790',
+//   actorId: 'actor_118544',
+// })

@@ -1,14 +1,17 @@
 export function apiFetch(input: string, init?: any) {
   const headers = new Headers(init?.headers as any)
   const token = (localStorage as any).token
-  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+  if (token && !headers.has('Authorization'))
+    headers.set('Authorization', `Bearer ${token}`)
   let url = input
-  if (!/^https?:\/\//.test(url)) {
-    if (url.startsWith('/api/')) url = '/vite' + url
-    else if (url.startsWith('api/')) url = 'vite/' + url
+  if (window.e) {
+    url = 'http://xfjs-api.zkyr.net.cn/' + url
+  } else {
+    url = 'vite/' + url
   }
   let method = 'GET'
-  if (init && typeof init === 'object' && typeof init.method === 'string') method = String(init.method).toUpperCase()
+  if (init && typeof init === 'object' && typeof init.method === 'string')
+    method = String(init.method).toUpperCase()
   const known: Record<string, true> = {
     method: true,
     headers: true,
@@ -38,7 +41,8 @@ export function apiFetch(input: string, init?: any) {
   }
   const fetchInit: RequestInit = { headers }
   if (method === 'GET') {
-    const source = init && typeof init === 'object' ? (init.params ?? init) : undefined
+    const source =
+      init && typeof init === 'object' ? init.params ?? init : undefined
     const sp = source ? buildParams(source) : undefined
     if (sp && String(sp)) {
       const qs = sp.toString()
@@ -48,7 +52,12 @@ export function apiFetch(input: string, init?: any) {
   } else {
     let body: any = undefined
     if (init && typeof init === 'object' && 'body' in init) body = init.body
-    else if (init && typeof FormData !== 'undefined' && init instanceof FormData) body = init
+    else if (
+      init &&
+      typeof FormData !== 'undefined' &&
+      init instanceof FormData
+    )
+      body = init
     else if (init && typeof init === 'object') {
       const payload: any = {}
       for (const k in init) {
@@ -61,13 +70,15 @@ export function apiFetch(input: string, init?: any) {
       headers.delete('Content-Type')
       fetchInit.body = body as any
     } else if (body !== undefined) {
-      if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-      fetchInit.body = typeof body === 'string' ? (body as any) : JSON.stringify(body)
+      if (!headers.has('Content-Type'))
+        headers.set('Content-Type', 'application/json')
+      fetchInit.body =
+        typeof body === 'string' ? (body as any) : JSON.stringify(body)
     }
     fetchInit.method = method
   }
   return fetch(url, fetchInit).then(res => {
-    if ((res.status === 401) && !(window as any)._redirectingToLogin) {
+    if (res.status === 401 && !(window as any)._redirectingToLogin) {
       ;(window as any)._redirectingToLogin = true
       try {
         delete (window as any).token
@@ -82,7 +93,7 @@ export function apiFetch(input: string, init?: any) {
 }
 declare global {
   interface Window {
-    apiJson: typeof apiJson;
+    apiJson: typeof apiJson
   }
 }
 
@@ -95,10 +106,15 @@ export async function apiJson(input: string, init?: any) {
     data = null
   }
   if (!res.ok) {
-    const msg = (data as any)?.message || (data as any)?.messgae || (data as any)?.detail || `请求失败(${res.status})`
+    const msg =
+      (data as any)?.message ||
+      (data as any)?.messgae ||
+      (data as any)?.detail ||
+      `请求失败(${res.status})`
     throw new Error(msg)
   }
-  if (data && typeof data === 'object' && 'data' in data) return (data as any).data
+  if (data && typeof data === 'object' && 'data' in data)
+    return (data as any).data
   return data
 }
 

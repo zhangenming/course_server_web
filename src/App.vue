@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import NextCas from '@nextcas/sdk'
-import {
-  Record,
-  Asr
-} from '@nextcas/voice';
+import { Record, Asr } from '@nextcas/voice'
 
 import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
@@ -58,7 +55,9 @@ const getGrade = (score: number) => {
 
 // 当前问题
 const currentQuestion = computed(() => {
-  return questions.value[currentQuestionIndex.value] || { text: '', options: [] }
+  return (
+    questions.value[currentQuestionIndex.value] || { text: '', options: [] }
+  )
 })
 
 // 是否是最后一题
@@ -77,7 +76,8 @@ const selectedCourse = ref<{
 const playingVideo = ref(false)
 const isMusicPlaying = ref(false)
 const audioEl = ref<HTMLAudioElement | null>(null)
-const TEST_VIDEO = 'https://xfjs-api.zkyr.net.cn/static/media/vid/9f38419bb0ff4dba.mp4'
+const TEST_VIDEO =
+  'https://xfjs-api.zkyr.net.cn/static/media/vid/9f38419bb0ff4dba.mp4'
 
 const showVideoList = ref(false)
 const videos = ref<any[]>([])
@@ -87,8 +87,12 @@ const openVideoList = async () => {
   cas.speak(spks.chooseVideo)
   enterIconUI()
   try {
-    const data = await apiJson('vite/api/v1/courses/simple')
-    const arr = Array.isArray((data as any)?.data) ? (data as any).data : Array.isArray(data) ? (data as any) : []
+    const data = await apiJson('api/v1/courses/simple')
+    const arr = Array.isArray((data as any)?.data)
+      ? (data as any).data
+      : Array.isArray(data)
+      ? (data as any)
+      : []
     videos.value = arr
   } catch {
     videos.value = []
@@ -116,11 +120,11 @@ const onListPlayerEnded = async () => {
   listPlayerSrc.value = null
   try {
     await recordCourseProgress()
-  } catch { }
+  } catch {}
   showSurveyThemeSelect.value = true
   try {
     await loadSurveys()
-  } catch { }
+  } catch {}
 }
 
 const hasModal = computed(() => {
@@ -162,13 +166,22 @@ const enterIconUI = () => {
   showBegin.value = false
 }
 const exitIconUI = () => {
-  if (!showSurvey.value && !showResult.value && !playingVideo.value && !showVideoList.value && !showListPlayer.value && !showCommandMenu.value) {
+  if (
+    !showSurvey.value &&
+    !showResult.value &&
+    !playingVideo.value &&
+    !showVideoList.value &&
+    !showListPlayer.value &&
+    !showCommandMenu.value
+  ) {
     showBegin.value = true
   }
 }
 
 const showCommandMenu = ref(false)
-const commandList = ref<Array<{ label: string; icon: string; command?: string }>>([
+const commandList = ref<
+  Array<{ label: string; icon: string; command?: string }>
+>([
   { label: '柔和模式', icon: '🧡', command: 'soft' },
   { label: '香氛模式3', icon: '🪔', command: 'fragrance3' },
   { label: '香氛模式2', icon: '🪔', command: 'fragrance2' },
@@ -185,12 +198,16 @@ const closeCommandMenu = () => {
   showCommandMenu.value = false
   exitIconUI()
 }
-const execCommand = async (cmd: { label: string; icon: string; command?: string }) => {
+const execCommand = async (cmd: {
+  label: string
+  icon: string
+  command?: string
+}) => {
   speakCas(cmd.label)
   showCommandMenu.value = false
   exitIconUI()
   try {
-    await apiJson('vite/commons/', { method: 'POST', body: { name: cmd.label } })
+    await apiJson('commons/', { method: 'POST', body: { name: cmd.label } })
   } catch (e: any) {
     notifyListError(e?.message || '指令执行失败')
   }
@@ -262,13 +279,18 @@ const startSurvey = () => {
   userAnswers.value = []
   showResult.value = false
 }
-const chooseCourse = (course: { id: number; title: string; description: string | null; video_url: string | null; cover_url: string | null }) => {
+const chooseCourse = (course: {
+  id: number
+  title: string
+  description: string | null
+  video_url: string | null
+  cover_url: string | null
+}) => {
   if (!course.video_url) return
   selectedCourse.value = course
   showCourseSelect.value = false
   playingVideo.value = true
 }
-
 
 const meUserId = ref<number | null>(null)
 const ensureUserId = async () => {
@@ -277,14 +299,19 @@ const ensureUserId = async () => {
     const me = await apiJson('api/v1/users/me')
     const uid = Number((me as any)?.user_id ?? (me as any)?.data?.user_id)
     meUserId.value = Number.isFinite(uid) ? uid : null
-  } catch { }
+  } catch {}
   return meUserId.value
 }
 const recordCourseProgress = async () => {
   const courseId = Number((selectedCourse.value as any)?.id)
   if (!courseId) return
   const uid = await ensureUserId()
-  const body = { user_id: uid ?? undefined, progress: 100, completed: true, study_minutes: 1 }
+  const body = {
+    user_id: uid ?? undefined,
+    progress: 100,
+    completed: true,
+    study_minutes: 1,
+  }
   try {
     await apiJson(`api/v1/courses/${courseId}/progress`, {
       method: 'PATCH',
@@ -298,7 +325,7 @@ const recordCourseProgress = async () => {
 
 const onVideoEnded = () => {
   playingVideo.value = false
-  recordCourseProgress().catch(() => { })
+  recordCourseProgress().catch(() => {})
   showSurveyThemeSelect.value = true
   cas.speak(spks.chooseSurvey)
   loadSurveys()
@@ -326,7 +353,7 @@ const stopMusic = () => {
       audioEl.value.pause()
       audioEl.value.src = ''
     }
-  } catch { }
+  } catch {}
   isMusicPlaying.value = false
 }
 const startChat = () => {
@@ -347,7 +374,7 @@ const loadSurveys = async () => {
   try {
     const data = await apiJson('api/v1/surveys')
     if (Array.isArray(data)) surveys.value = data
-  } catch { }
+  } catch {}
 }
 
 const chooseSurveyTheme = async (s: { id: number; theme: string }) => {
@@ -368,21 +395,22 @@ const fetchSurveyDetail = async (surveyId: number) => {
       questions.value = detail.questions
       ranges.value = detail.ranges
     }
-  } catch { }
+  } catch {}
 }
-
 
 const submitSurveyResponses = async () => {
   const sid = Number(selectedSurveyId.value)
   if (!sid || !Array.isArray(questions.value) || !questions.value.length) return
-  const answers = questions.value.map((q: any, i: number) => {
-    const optIndex = selectedIndex.value[i]
-    const opt = (q?.options || [])[optIndex]
-    return {
-      question_id: Number(q?.id ?? i + 1),
-      option_id: Number(opt?.id ?? optIndex),
-    }
-  }).filter(x => Number.isFinite(x.option_id))
+  const answers = questions.value
+    .map((q: any, i: number) => {
+      const optIndex = selectedIndex.value[i]
+      const opt = (q?.options || [])[optIndex]
+      return {
+        question_id: Number(q?.id ?? i + 1),
+        option_id: Number(opt?.id ?? optIndex),
+      }
+    })
+    .filter(x => Number.isFinite(x.option_id))
   try {
     await apiJson(`api/v1/surveys/${sid}/responses`, {
       method: 'POST',
@@ -396,11 +424,13 @@ const submitSurveyResponses = async () => {
 // 下一题
 const nextQuestion = () => {
   if (isLastQuestion.value) {
-    submitSurveyResponses().then(() => {
-      showResult.value = true
-    }).catch(() => {
-      showResult.value = true
-    })
+    submitSurveyResponses()
+      .then(() => {
+        showResult.value = true
+      })
+      .catch(() => {
+        showResult.value = true
+      })
     try {
       const grade = getGrade(totalScore.value as any)
       const label = (grade as any)?.label || '未知'
@@ -408,10 +438,10 @@ const nextQuestion = () => {
         onEnd: () => {
           setTimeout(() => {
             cas.speak(spks.course)
-          }, 400);
-        }
+          }, 400)
+        },
       })
-    } catch { }
+    } catch {}
   } else {
     currentQuestionIndex.value++
   }
@@ -471,28 +501,25 @@ const speakCas = (
 }
 let AsrTTS
 onMounted(async () => {
-
   const token = await createAccessToken()
 
   AsrTTS = new Asr(token, {
     actorId: 'actor_118544',
-    model: '16k_zh'
+    model: '16k_zh',
   })
-		AsrTTS.on("ready", () => console.log("ASR 准备就绪"));
-		AsrTTS.on("sentenceBegin", () => {
-			// 停止对话
-			// cas.stopAct()
-			console.log("ASR 开始识别")
-		});
-		AsrTTS.on("sentenceEnd", (data) => {
-			console.log("一句话识别结束", data);
-			if (AsrTTS) {
-				cas.stopAct()
-				cas.ask(data);
-			}
-		});
-
-    
+  AsrTTS.on('ready', () => console.log('ASR 准备就绪'))
+  AsrTTS.on('sentenceBegin', () => {
+    // 停止对话
+    // cas.stopAct()
+    console.log('ASR 开始识别')
+  })
+  AsrTTS.on('sentenceEnd', data => {
+    console.log('一句话识别结束', data)
+    if (AsrTTS) {
+      cas.stopAct()
+      cas.ask(data)
+    }
+  })
 
   cas = new NextCas(document.getElementById('container')!, {
     token,
@@ -515,6 +542,10 @@ onMounted(async () => {
     })
   })
 
+  cas.on('error', error => {
+    console.error('CAS 错误:', error)
+  })
+
   cas.on('reply', data => {
     const { content } = data.data
     console.log('reply', content)
@@ -524,17 +555,15 @@ onMounted(async () => {
     }
 
     if (content === replys.请问您是否坐好了.是) {
-      cas.speak
-        (replys.请问您是否坐好了.是, {
-          onEnd() {
-            setTimeout(() => {
-              cas.ask(asks.fragrance1)
-              playFirstMusic()
-            }, 200);
-          }
-        })
+      cas.speak(replys.请问您是否坐好了.是, {
+        onEnd() {
+          setTimeout(() => {
+            cas.ask(asks.fragrance1)
+            playFirstMusic()
+          }, 200)
+        },
+      })
     }
-
   })
 })
 
@@ -545,9 +574,9 @@ function handleJsx() {
 }
 
 let record: Record
-  ; (async () => {
-    record = new Record(await createAccessToken(), 'actor_118544')
-  })()
+;(async () => {
+  record = new Record(await createAccessToken(), 'actor_118544')
+})()
 
 const isListening = ref(false)
 const onTouchStart = () => {
@@ -561,23 +590,25 @@ const onTouchEnd = () => {
   record
     .stopToText('16k_zh')
     .then(text => {
-
       console.log('语音识别结果', text)
       if (!text) return
 
-      const t = String(text).trim().toLowerCase().replace(/[，。！？、,.!\-\s]/g, '')
+      const t = String(text)
+        .trim()
+        .toLowerCase()
+        .replace(/[，。！？、,.!\-\s]/g, '')
       const intents = ['体验课程', '体验课', '开始课程', '开始体验课程']
       if (intents.some(k => t.includes(k))) {
         startSurvey()
         return
       }
 
-      if ( ['聊天','对话'].includes(t)) {
-        AsrTTS.start();
+      if (['聊天', '对话'].includes(t)) {
+        AsrTTS.start()
         return
       }
-      if ( ['下课'].includes(t)) {
-        AsrTTS.stop();
+      if (['下课'].includes(t)) {
+        AsrTTS.stop()
         return
       }
       cas.ask(text)
@@ -607,7 +638,7 @@ const playFirstMusic = async () => {
       await audioEl.value.play()
       isMusicPlaying.value = true
     }
-  } catch { }
+  } catch {}
 }
 const toggleFabMusic = async () => {
   if (isMusicPlaying.value) {
@@ -649,15 +680,22 @@ const appBgUrl = appBg as any as string
               <el-button @click="backToBegin"> 返回上一步 </el-button>
             </div>
             <div class="course-list">
-              <div class="course-card" :class="{ disabled: !course.video_url }" v-for="course in 课程data"
-                :key="course.id" @click="chooseCourse(course)">
+              <div
+                class="course-card"
+                :class="{ disabled: !course.video_url }"
+                v-for="course in 课程data"
+                :key="course.id"
+                @click="chooseCourse(course)"
+              >
                 <div class="cover" v-if="course.cover_url">
                   <img :src="course.cover_url" alt="cover" />
                 </div>
                 <div class="info">
                   <div class="title">{{ course.title }}</div>
                   <div class="desc">{{ course.description || '暂无描述' }}</div>
-                  <div class="tip" v-if="!course.video_url">无视频，暂不可体验</div>
+                  <div class="tip" v-if="!course.video_url">
+                    无视频，暂不可体验
+                  </div>
                 </div>
               </div>
             </div>
@@ -666,35 +704,78 @@ const appBgUrl = appBg as any as string
       </transition>
 
       <transition name="fade-scale">
-        <div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
+        <div
+          v-if="playingVideo && selectedCourse"
+          class="modal-overlay"
+          @click.self="closeVideo"
+        >
           <div class="video-modal">
-            <el-button class="close-circle" @click="closeVideo" aria-label="关闭视频" title="关闭"> × </el-button>
-            <video :key="selectedCourse.id" :src="selectedCourse.video_url!" controls autoplay muted playsinline
-              preload="metadata" @ended="onVideoEnded" @error="onVideoError"></video>
+            <el-button
+              class="close-circle"
+              @click="closeVideo"
+              aria-label="关闭视频"
+              title="关闭"
+            >
+              ×
+            </el-button>
+            <video
+              :key="selectedCourse.id"
+              :src="selectedCourse.video_url!"
+              controls
+              autoplay
+              muted
+              playsinline
+              preload="metadata"
+              @ended="onVideoEnded"
+              @error="onVideoError"
+            ></video>
           </div>
         </div>
       </transition>
 
-      <audio ref="audioEl" style="display: none" @ended="isMusicPlaying = false"
-        @error="isMusicPlaying = false"></audio>
+      <audio
+        ref="audioEl"
+        style="display: none"
+        @ended="isMusicPlaying = false"
+        @error="isMusicPlaying = false"
+      ></audio>
 
       <transition name="fade-scale">
-        <div v-if="showSurveyThemeSelect" class="modal-overlay top-overlay survey-overlay"
-          @click.self="closeSurveyPick">
+        <div
+          v-if="showSurveyThemeSelect"
+          class="modal-overlay top-overlay survey-overlay"
+          @click.self="closeSurveyPick"
+        >
           <div class="survey-dialog">
             <div class="dialog-header">
               <h3>测评</h3>
-              <el-button class="close-circle" @click="closeSurveyPick" aria-label="关闭" title="关闭">×</el-button>
+              <el-button
+                class="close-circle"
+                @click="closeSurveyPick"
+                aria-label="关闭"
+                title="关闭"
+                >×</el-button
+              >
             </div>
             <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
             <div class="dialog-list">
-              <button class="dialog-item" :class="{ selected: selectedSurveyId === s.id }" v-for="s in surveys"
-                :key="s.id" @click="selectedSurveyId = s.id">
+              <button
+                class="dialog-item"
+                :class="{ selected: selectedSurveyId === s.id }"
+                v-for="s in surveys"
+                :key="s.id"
+                @click="selectedSurveyId = s.id"
+              >
                 <span class="item-text">{{ s.theme || '未命名问卷' }}</span>
               </button>
             </div>
             <div class="dialog-actions">
-              <el-button type="primary" :disabled="!selectedSurveyId" @click="startSurveyPick">开始测评</el-button>
+              <el-button
+                type="primary"
+                :disabled="!selectedSurveyId"
+                @click="startSurveyPick"
+                >开始测评</el-button
+              >
             </div>
           </div>
         </div>
@@ -706,8 +787,16 @@ const appBgUrl = appBg as any as string
             <div class="survey-header">
               <h2>问卷答题</h2>
               <div class="header-right">
-                <div class="progress">题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</div>
-                <el-button class="close-circle" @click="goHome" aria-label="关闭" title="关闭">×</el-button>
+                <div class="progress">
+                  题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
+                </div>
+                <el-button
+                  class="close-circle"
+                  @click="goHome"
+                  aria-label="关闭"
+                  title="关闭"
+                  >×</el-button
+                >
               </div>
             </div>
 
@@ -715,22 +804,36 @@ const appBgUrl = appBg as any as string
               <h3>{{ currentQuestion.text }}</h3>
 
               <div class="options">
-                <div v-for="(option, index) in currentQuestion.options" :key="index" class="option" :class="{
-                  selected: selectedIndex[currentQuestionIndex] === index,
-                }" @click="selectAnswer(index, option.value)">
-                  <span class="option-label">{{ String.fromCharCode(65 + index) }}</span>
+                <div
+                  v-for="(option, index) in currentQuestion.options"
+                  :key="index"
+                  class="option"
+                  :class="{
+                    selected: selectedIndex[currentQuestionIndex] === index,
+                  }"
+                  @click="selectAnswer(index, option.value)"
+                >
+                  <span class="option-label">{{
+                    String.fromCharCode(65 + index)
+                  }}</span>
                   <span class="option-text">{{ option.text }}</span>
                   <span class="option-value">{{ option.value }}分</span>
                 </div>
               </div>
 
               <div class="navigation">
-                <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
+                <el-button
+                  @click="prevQuestion"
+                  :disabled="currentQuestionIndex === 0"
+                  >上一题</el-button
+                >
 
-                <el-button type="primary" @click="nextQuestion"
-                  :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
-                    isLastQuestion ? '提交' : '下一题'
-                  }}</el-button>
+                <el-button
+                  type="primary"
+                  @click="nextQuestion"
+                  :disabled="selectedIndex[currentQuestionIndex] === undefined"
+                  >{{ isLastQuestion ? '提交' : '下一题' }}</el-button
+                >
               </div>
             </div>
           </div>
@@ -742,25 +845,54 @@ const appBgUrl = appBg as any as string
           <div class="result-card">
             <div class="result-summary">
               <span class="result-prefix">根据您的情况</span>
-              <span class="grade-badge">{{ getGrade(totalScore)?.label || '' }}</span>
+              <span class="grade-badge">{{
+                getGrade(totalScore)?.label || ''
+              }}</span>
             </div>
             <div class="result-actions">
-              <el-button type="primary" @click="restartSurvey"> 重新评测 </el-button>
-              <el-button type="primary" @click="closeResultModal">继续</el-button>
+              <el-button type="primary" @click="restartSurvey">
+                重新评测
+              </el-button>
+              <el-button type="primary" @click="closeResultModal"
+                >继续</el-button
+              >
             </div>
           </div>
         </div>
       </transition>
     </div>
   </div>
-  <el-button class="voice-button" :class="{ listening: isListening }" @mousedown="onTouchStart" @mouseup="onTouchEnd"
-    @mouseleave="onTouchEnd" @touchstart.prevent="onTouchStart" @touchend.prevent="onTouchEnd" aria-label="按住说话">
+  <el-button
+    class="voice-button"
+    :class="{ listening: isListening }"
+    @mousedown="onTouchStart"
+    @mouseup="onTouchEnd"
+    @mouseleave="onTouchEnd"
+    @touchstart.prevent="onTouchStart"
+    @touchend.prevent="onTouchEnd"
+    aria-label="按住说话"
+  >
     <span class="voice-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="26" height="26">
         <rect x="9" y="4" width="6" height="10" rx="3" fill="currentColor" />
-        <path d="M5 11a7 7 0 0014 0" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M12 18v3" fill="none" stroke="currentColor" stroke-width="1.6" />
-        <path d="M8 21h8" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path
+          d="M5 11a7 7 0 0014 0"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+        <path
+          d="M12 18v3"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
+        <path
+          d="M8 21h8"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        />
       </svg>
     </span>
   </el-button>
@@ -768,32 +900,87 @@ const appBgUrl = appBg as any as string
     <div v-show="!hasModal" class="left-fab">
       <button class="fab-btn" title="课程列表" @click="openVideoList">
         <svg viewBox="0 0 24 24" width="22" height="22">
-          <rect x="5" y="7" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <rect
+            x="5"
+            y="7"
+            width="14"
+            height="10"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
           <path d="M10 9l6 3-6 3V9" fill="currentColor" />
         </svg>
       </button>
       <button class="fab-btn" title="命令模式" @click="openCommandMenu">
         <svg viewBox="0 0 24 24" width="24" height="24">
-          <rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" />
-          <path d="M7 10l3 2-3 2" fill="none" stroke="currentColor" stroke-width="1.6" />
-          <path d="M12 14h5" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <rect
+            x="3"
+            y="5"
+            width="18"
+            height="14"
+            rx="3"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
+          <path
+            d="M7 10l3 2-3 2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
+          <path
+            d="M12 14h5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
         </svg>
       </button>
 
-      <button class="fab-btn" :title="isMusicPlaying ? '停止音乐' : '播放音乐'" @click="toggleFabMusic">
+      <button
+        class="fab-btn"
+        :title="isMusicPlaying ? '停止音乐' : '播放音乐'"
+        @click="toggleFabMusic"
+      >
         <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
           <path d="M10 8l6 4-6 4V8" fill="currentColor" />
         </svg>
         <svg v-else viewBox="0 0 24 24" width="24" height="24">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
           <rect x="8" y="7" width="3" height="10" fill="currentColor" />
           <rect x="13" y="7" width="3" height="10" fill="currentColor" />
         </svg>
       </button>
       <button class="fab-btn" title="测评选择" @click="openSurveyPicker">
         <svg viewBox="0 0 24 24" width="22" height="22">
-          <rect x="6" y="5" width="12" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <rect
+            x="6"
+            y="5"
+            width="12"
+            height="14"
+            rx="2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+          />
           <path d="M9 9h6" stroke="currentColor" stroke-width="1.6" />
           <path d="M9 13h6" stroke="currentColor" stroke-width="1.6" />
           <path d="M9 17h6" stroke="currentColor" stroke-width="1.6" />
@@ -802,14 +989,29 @@ const appBgUrl = appBg as any as string
     </div>
   </transition>
   <transition name="fade-scale">
-    <div v-if="showVideoList" class="modal-overlay top-overlay" @click.self="closeVideoList">
+    <div
+      v-if="showVideoList"
+      class="modal-overlay top-overlay"
+      @click.self="closeVideoList"
+    >
       <div class="video-list-modal">
         <div class="video-list-header">
           <h2>课程列表</h2>
-          <el-button class="close-circle" @click="closeVideoList" aria-label="关闭" title="关闭">×</el-button>
+          <el-button
+            class="close-circle"
+            @click="closeVideoList"
+            aria-label="关闭"
+            title="关闭"
+            >×</el-button
+          >
         </div>
         <div class="video-grid">
-          <div class="video-item" v-for="v in videos" :key="v.id" @click="playVideoFromList(v)">
+          <div
+            class="video-item"
+            v-for="v in videos"
+            :key="v.id"
+            @click="playVideoFromList(v)"
+          >
             <div class="thumb">
               <img :src="v.i_url || v.cover_url || ''" alt="thumbnail" />
             </div>
@@ -823,9 +1025,18 @@ const appBgUrl = appBg as any as string
     </div>
   </transition>
   <transition name="fade-scale">
-    <div v-if="showCommandMenu" class="cmd-overlay" @click.self="closeCommandMenu">
+    <div
+      v-if="showCommandMenu"
+      class="cmd-overlay"
+      @click.self="closeCommandMenu"
+    >
       <div class="cmd-menu">
-        <div class="cmd-item" v-for="(c, i) in commandList" :key="i" @click="execCommand(c)">
+        <div
+          class="cmd-item"
+          v-for="(c, i) in commandList"
+          :key="i"
+          @click="execCommand(c)"
+        >
           <span class="cmd-icon">{{ c.icon }}</span>
           <span class="cmd-label">{{ c.label }}</span>
         </div>
@@ -836,11 +1047,28 @@ const appBgUrl = appBg as any as string
     {{ listError }}
   </div>
   <transition name="fade-scale">
-    <div v-if="showListPlayer && listPlayerSrc" class="modal-overlay" @click.self="closeListPlayer">
+    <div
+      v-if="showListPlayer && listPlayerSrc"
+      class="modal-overlay"
+      @click.self="closeListPlayer"
+    >
       <div class="video-modal">
-        <el-button class="close-circle" @click="closeListPlayer" aria-label="关闭视频" title="关闭">×</el-button>
-        <video :src="listPlayerSrc!" controls autoplay playsinline preload="metadata" @ended="onListPlayerEnded"
-          @error="onListPlayerError"></video>
+        <el-button
+          class="close-circle"
+          @click="closeListPlayer"
+          aria-label="关闭视频"
+          title="关闭"
+          >×</el-button
+        >
+        <video
+          :src="listPlayerSrc!"
+          controls
+          autoplay
+          playsinline
+          preload="metadata"
+          @ended="onListPlayerEnded"
+          @error="onListPlayerError"
+        ></video>
       </div>
     </div>
   </transition>
@@ -894,7 +1122,12 @@ const appBgUrl = appBg as any as string
   bottom: 14px;
   width: clamp(220px, 20vw, 320px);
   height: 18px;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.22) 0%, rgba(0, 0, 0, 0.12) 42%, rgba(0, 0, 0, 0) 72%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.22) 0%,
+    rgba(0, 0, 0, 0.12) 42%,
+    rgba(0, 0, 0, 0) 72%
+  );
   border-radius: 9999px;
   pointer-events: none;
   z-index: 0;
@@ -1102,9 +1335,11 @@ const appBgUrl = appBg as any as string
   transform: scale(0.98);
 }
 
-.audio-bar {}
+.audio-bar {
+}
 
-.audio-bar audio {}
+.audio-bar audio {
+}
 
 .modal-close {
   position: absolute;
@@ -1204,13 +1439,21 @@ const appBgUrl = appBg as any as string
 }
 
 .dialog-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(99, 102, 241, .35), rgba(147, 197, 253, .35));
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.35),
+    rgba(147, 197, 253, 0.35)
+  );
   border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, .5);
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .dialog-list::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(99, 102, 241, .55), rgba(147, 197, 253, .55));
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.55),
+    rgba(147, 197, 253, 0.55)
+  );
 }
 
 .dialog-item {
@@ -1523,7 +1766,8 @@ const appBgUrl = appBg as any as string
   transform: translateX(-50%);
   z-index: 1100;
   background: linear-gradient(#ffffffcc, #ffffffcc) padding-box,
-    linear-gradient(180deg, rgba(167, 139, 250, 0.9), rgba(96, 165, 250, 0.9)) border-box;
+    linear-gradient(180deg, rgba(167, 139, 250, 0.9), rgba(96, 165, 250, 0.9))
+      border-box;
   color: var(--primary);
   border: 2px solid transparent;
   border-radius: 9999px;
@@ -1536,13 +1780,13 @@ const appBgUrl = appBg as any as string
   display: inline-flex;
   align-items: center;
   justify-content: center;
- position: fixed;
-    right: -127px;
-    bottom: 43%;
+  position: fixed;
+  right: -127px;
+  bottom: 43%;
 }
-.voice-button>span{
- position: relative;
- left:10px
+.voice-icon {
+  position: relative;
+  left: -10px;
 }
 .voice-button:hover {
   box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3);
@@ -1562,7 +1806,11 @@ const appBgUrl = appBg as any as string
   position: absolute;
   inset: -4px;
   border-radius: 9999px;
-  background: radial-gradient(closest-side, rgba(124, 58, 237, 0.18), rgba(124, 58, 237, 0) 70%);
+  background: radial-gradient(
+    closest-side,
+    rgba(124, 58, 237, 0.18),
+    rgba(124, 58, 237, 0) 70%
+  );
   z-index: -1;
 }
 
@@ -1736,7 +1984,8 @@ const appBgUrl = appBg as any as string
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1752,7 +2001,8 @@ const appBgUrl = appBg as any as string
 
 .fab-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
   filter: brightness(1.05);
 }
 
@@ -1814,13 +2064,21 @@ const appBgUrl = appBg as any as string
 }
 
 .video-grid::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(99, 102, 241, .35), rgba(147, 197, 253, .35));
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.35),
+    rgba(147, 197, 253, 0.35)
+  );
   border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, .5);
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .video-grid::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(99, 102, 241, .55), rgba(147, 197, 253, .55));
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.55),
+    rgba(147, 197, 253, 0.55)
+  );
 }
 
 .video-item {
@@ -1831,7 +2089,8 @@ const appBgUrl = appBg as any as string
   display: flex;
   flex-direction: column;
   min-height: 240px;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease,
+    border-color 0.16s ease;
 }
 
 .video-item:nth-child(2n) {

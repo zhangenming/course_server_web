@@ -7,6 +7,7 @@ import mkcert from 'vite-plugin-mkcert'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), mkcert()],
+  base: './',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -25,10 +26,21 @@ export default defineConfig({
             console.log('111 proxy error', err)
           })
           proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('111 Sending Request:', req.url, ' => TO THE TARGET =>  ', proxyReq.host, proxyReq.path)
+            console.log(
+              '111 Sending Request:',
+              req.url,
+              ' => TO THE TARGET =>  ',
+              proxyReq.host,
+              proxyReq.path
+            )
           })
           proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('111 Received Response from the Target:', proxyRes.statusCode, req.url, JSON.stringify(proxyRes.headers))
+            console.log(
+              '111 Received Response from the Target:',
+              proxyRes.statusCode,
+              req.url,
+              JSON.stringify(proxyRes.headers)
+            )
           })
         },
       },

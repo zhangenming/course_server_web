@@ -3,7 +3,14 @@ import { ref, computed } from 'vue'
 import { apiJson } from '@/utils/request'
 import { apiFetch } from '@/utils/request'
 import { ElIcon } from 'element-plus'
-import { User, Lock, View, Hide, Warning, CircleCheck } from '@element-plus/icons-vue'
+import {
+  User,
+  Lock,
+  View,
+  Hide,
+  Warning,
+  CircleCheck,
+} from '@element-plus/icons-vue'
 
 const username = ref('')
 const password = ref('')
@@ -52,26 +59,26 @@ const isFormValid = computed(() => {
 
 const submit = async () => {
   if (loading.value) return
-  
+
   const isUsernameValid = validateUsername()
   const isPasswordValid = validatePassword()
-  
+
   if (!isUsernameValid || !isPasswordValid) {
     return
   }
-  
+
   loading.value = true
   error.value = null
-  
+
   try {
-    const data = await apiJson('vite/commons/login', {
+    const data = await apiJson('commons/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: username.value.trim(), 
-        password: password.value, 
+      body: JSON.stringify({
+        username: username.value.trim(),
+        password: password.value,
         role: 'admin',
-        rememberMe: rememberMe.value 
+        rememberMe: rememberMe.value,
       }),
     })
     const token = (data as any)?.token || (data as any)?.data?.token
@@ -83,7 +90,7 @@ const submit = async () => {
       }
       ;(window as any).token = token
       localStorage.token = token
-      
+
       setTimeout(() => {
         location.reload()
       }, 500)
@@ -105,7 +112,9 @@ const togglePasswordVisibility = () => {
 const handleEnter = (field: 'username' | 'password') => {
   if (field === 'username') {
     validateUsername()
-    const passwordInput = document.querySelector('input[type="password"], input[type="text"]') as HTMLInputElement
+    const passwordInput = document.querySelector(
+      'input[type="password"], input[type="text"]'
+    ) as HTMLInputElement
     passwordInput?.focus()
   } else {
     validatePassword()
@@ -131,7 +140,7 @@ const socialLogin = (provider: string) => {
         <el-icon><Warning /></el-icon>
         {{ error }}
       </div>
-      
+
       <div class="login-card">
         <div class="card-header">
           <div class="logo">
@@ -140,7 +149,7 @@ const socialLogin = (provider: string) => {
           <h1 class="card-title">欢迎回来</h1>
           <p class="card-subtitle">请登录您的管理员账户</p>
         </div>
-        
+
         <form class="login-form" @submit.prevent="submit">
           <div class="form-group" :class="{ 'has-error': usernameError }">
             <label for="username" class="form-label">
@@ -168,7 +177,7 @@ const socialLogin = (provider: string) => {
               {{ usernameError }}
             </div>
           </div>
-          
+
           <div class="form-group" :class="{ 'has-error': passwordError }">
             <label for="password" class="form-label">
               <el-icon><Lock /></el-icon>
@@ -203,7 +212,7 @@ const socialLogin = (provider: string) => {
               {{ passwordError }}
             </div>
           </div>
-          
+
           <div class="form-options">
             <label class="checkbox-wrapper">
               <input
@@ -217,12 +226,12 @@ const socialLogin = (provider: string) => {
               忘记密码？
             </button>
           </div>
-          
+
           <button
             type="submit"
             class="submit-button"
             :disabled="loading || !isFormValid"
-            :class="{ 'loading': loading }"
+            :class="{ loading: loading }"
           >
             <span v-if="!loading">登录</span>
             <span v-else class="loading-text">
@@ -231,11 +240,11 @@ const socialLogin = (provider: string) => {
             </span>
           </button>
         </form>
-        
+
         <div class="divider">
           <span class="divider-text">或使用以下方式登录</span>
         </div>
-        
+
         <!-- <div class="social-login">
           <button
             type="button"
@@ -266,7 +275,7 @@ const socialLogin = (provider: string) => {
           </button> -->
         <!-- </div> -->
       </div>
-      
+
       <div class="login-footer">
         <p class="footer-text">
           登录即表示您同意我们的
@@ -305,9 +314,15 @@ const socialLogin = (provider: string) => {
 }
 
 @keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .login-container {
@@ -352,8 +367,7 @@ const socialLogin = (provider: string) => {
   backdrop-filter: blur(20px);
   border-radius: 24px;
   padding: 40px;
-  box-shadow: 
-    0 25px 50px rgba(0, 0, 0, 0.15),
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: fadeInUp 0.6s ease-out;
@@ -393,8 +407,13 @@ const socialLogin = (provider: string) => {
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 .card-title {
@@ -521,8 +540,14 @@ const socialLogin = (provider: string) => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .form-options {
@@ -640,8 +665,12 @@ const socialLogin = (provider: string) => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .divider {
@@ -724,19 +753,19 @@ const socialLogin = (provider: string) => {
     padding: 32px 24px;
     margin: 0 16px;
   }
-  
+
   .card-title {
     font-size: 24px;
   }
-  
+
   .social-login {
     gap: 8px;
   }
-  
+
   .social-button {
     padding: 12px 8px;
   }
-  
+
   .form-options {
     flex-direction: column;
     gap: 12px;
@@ -748,21 +777,21 @@ const socialLogin = (provider: string) => {
   .login-card {
     padding: 24px 20px;
   }
-  
+
   .logo-image {
     width: 56px;
     height: 56px;
     padding: 6px;
   }
-  
+
   .card-title {
     font-size: 22px;
   }
-  
+
   .social-login {
     flex-direction: column;
   }
-  
+
   .social-button {
     flex-direction: row;
     justify-content: center;
@@ -776,15 +805,15 @@ const socialLogin = (provider: string) => {
     background: #ffffff;
     border: 2px solid #000000;
   }
-  
+
   .form-input {
     border-width: 2px;
   }
-  
+
   .submit-button {
     border: 2px solid #000000;
   }
-  
+
   .logo-image {
     background: #ffffff;
     border: 2px solid #000000;
@@ -798,15 +827,15 @@ const socialLogin = (provider: string) => {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
+
   .login-page {
     animation: none;
   }
-  
+
   .login-card {
     animation: none;
   }
-  
+
   .logo-image {
     animation: none;
   }
@@ -817,59 +846,59 @@ const socialLogin = (provider: string) => {
   .login-page {
     background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   }
-  
+
   .login-card {
     background: rgba(30, 41, 59, 0.95);
     color: #f1f5f9;
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
-  
+
   .card-title {
     color: #f8fafc;
   }
-  
+
   .card-subtitle {
     color: #cbd5e1;
   }
-  
+
   .form-label {
     color: #e2e8f0;
   }
-  
+
   .form-input {
     background: rgba(15, 23, 42, 0.8);
     border-color: #475569;
     color: #f1f5f9;
   }
-  
+
   .form-input:focus {
     border-color: #818cf8;
     background: #1e293b;
   }
-  
+
   .form-input::placeholder {
     color: #64748b;
   }
-  
+
   .checkbox-label {
     color: #cbd5e1;
   }
-  
+
   .social-button {
     background: rgba(30, 41, 59, 0.8);
     border-color: #475569;
     color: #cbd5e1;
   }
-  
+
   .social-button:hover {
     background: #334155;
     border-color: #64748b;
   }
-  
+
   .footer-text {
     color: #94a3b8;
   }
-  
+
   .logo-image {
     background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   }
