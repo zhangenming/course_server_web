@@ -245,35 +245,7 @@ const socialLogin = (provider: string) => {
           <span class="divider-text">或使用以下方式登录</span>
         </div>
 
-        <!-- <div class="social-login">
-          <button
-            type="button"
-            class="social-button"
-            @click="socialLogin('微信')"
-            aria-label="微信登录"
-          >
-            <span class="social-icon">💬</span>
-            <span>微信</span>
-          </button>
-          <button
-            type="button"
-            class="social-button"
-            @click="socialLogin('QQ')"
-            aria-label="QQ登录"
-          >
-            <span class="social-icon">🐧</span>
-            <span>QQ</span>
-          </button>
-          <button
-            type="button"
-            class="social-button"
-            @click="socialLogin('钉钉')"
-            aria-label="钉钉登录"
-          >
-            <span class="social-icon">🔔</span>
-            <span>钉钉</span>
-          </button> -->
-        <!-- </div> -->
+        
       </div>
 
       <div class="login-footer">

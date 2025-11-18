@@ -393,11 +393,7 @@ const statusLabel = (s: string) => {
           <div class="stats-chart" ref="resourcesChartRef"></div>
         </div>
 
-        <!-- <div class="card quick-actions">
-          <el-button type="primary">导出报告</el-button>
-          <el-button>查看录像</el-button>
-          <el-button type="danger">归档记录</el-button>
-        </div> -->
+        
       </aside>
       <div v-if="showCreate" class="modal-overlay" @click.self="closeCreate">
         <div class="create-modal">

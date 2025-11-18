@@ -45,7 +45,7 @@ declare global {
       (() => {
         if (params.has('admin')) return Admin
         if (params.has('app')) return App
-        return window.e ? App : Admin
+        return location.origin === 'file://' ? App : Admin
       })()
     )
     app.use(ElementPlus, { locale: zhCn })
@@ -59,12 +59,3 @@ declare global {
     document.body.classList.remove('admin-mode')
   }
 })()
-
-// const token = await createAccessToken()
-// document.getElementById('app').style.height = '50px'
-// new NextCas(document.getElementById('app')!, {
-//   token,
-//   templateName: 'base',
-//   avatarId: 'avatar_482790',
-//   actorId: 'actor_118544',
-// })

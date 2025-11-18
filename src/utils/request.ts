@@ -4,7 +4,7 @@ export function apiFetch(input: string, init?: any) {
   if (token && !headers.has('Authorization'))
     headers.set('Authorization', `Bearer ${token}`)
   let url = input
-  if (window.e) {
+  if (location.origin === 'file://') {
     url = 'http://xfjs-api.zkyr.net.cn/' + url
   } else {
     url = 'vite/' + url

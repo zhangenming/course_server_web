@@ -6,10 +6,10 @@ import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
 import { simulateClick } from './utils'
 import { replys, spks, asks } from './config'
-import { apiJson, apiFetch } from '@/utils/request'
+import { apiJson } from '@/utils/request'
 import appBg from '@/assets/bg.jpg'
 
-const showBegin = ref(false)
+// 移除未使用的首页显示标志
 const showSurvey = ref(false)
 const currentQuestionIndex = ref(0)
 const userAnswers = ref<number[]>([])
@@ -31,13 +31,7 @@ const totalScore = computed(() => {
   return userAnswers.value.reduce((sum, score) => sum + score, 0)
 })
 
-// 计算最高分
-const maxScore = computed(() => {
-  return questions.value.reduce((sum, q) => {
-    const maxOptionValue = Math.max(...q.options.map(o => o.value))
-    return sum + maxOptionValue
-  }, 0)
-})
+// 已移除未使用的最高分计算
 
 // 获取评级
 const getGrade = (score: number) => {
@@ -76,8 +70,7 @@ const selectedCourse = ref<{
 const playingVideo = ref(false)
 const isMusicPlaying = ref(false)
 const audioEl = ref<HTMLAudioElement | null>(null)
-const TEST_VIDEO =
-  'https://xfjs-api.zkyr.net.cn/static/media/vid/9f38419bb0ff4dba.mp4'
+// 移除未使用的测试视频常量
 
 const showVideoList = ref(false)
 const videos = ref<any[]>([])
@@ -162,21 +155,8 @@ const onListPlayerError = () => {
   closeListPlayer()
 }
 
-const enterIconUI = () => {
-  showBegin.value = false
-}
-const exitIconUI = () => {
-  if (
-    !showSurvey.value &&
-    !showResult.value &&
-    !playingVideo.value &&
-    !showVideoList.value &&
-    !showListPlayer.value &&
-    !showCommandMenu.value
-  ) {
-    showBegin.value = true
-  }
-}
+const enterIconUI = () => {}
+const exitIconUI = () => {}
 
 const showCommandMenu = ref(false)
 const commandList = ref<
@@ -270,7 +250,6 @@ const 课程data = [
 // 开始答题
 const startSurvey = () => {
   cas.speak(spks.startSurveyTip)
-  showBegin.value = false
   showCourseSelect.value = true
   selectedCourse.value = null
   playingVideo.value = false
@@ -342,7 +321,6 @@ const onVideoError = () => {
 }
 const backToBegin = () => {
   showCourseSelect.value = false
-  showBegin.value = true
   selectedCourse.value = null
   playingVideo.value = false
   showSurvey.value = false
@@ -356,9 +334,7 @@ const stopMusic = () => {
   } catch {}
   isMusicPlaying.value = false
 }
-const startChat = () => {
-  showBegin.value = false
-}
+ 
 
 // 选择答案：记录选中索引与分值
 const selectAnswer = (index: number, value: number) => {
@@ -469,16 +445,12 @@ const closeResultModal = () => {
 }
 
 // 处理日常巡检点击
-const handleInspectionClick = () => {
-  speakCas('欢迎光临')
-  showBegin.value = false
-}
+ 
 
 // 返回首页
 const goHome = () => {
   showSurvey.value = false
   showResult.value = false
-  showBegin.value = true
 }
 
 let cas: NextCas
@@ -534,7 +506,6 @@ onMounted(async () => {
       onStart: () => {
         console.log('start')
         simulateClick()
-        showBegin.value = true
       },
       onEnd: () => {
         console.log('end')
@@ -640,6 +611,15 @@ const playFirstMusic = async () => {
     }
   } catch {}
 }
+const switchAccount = () => {
+  try {
+    delete (window as any).token
+    delete (localStorage as any).token
+  } catch {}
+  try {
+    location.reload()
+  } catch {}
+}
 const toggleFabMusic = async () => {
   if (isMusicPlaying.value) {
     stopMusic()
@@ -652,215 +632,201 @@ const appBgUrl = appBg as any as string
 
 <template>
   <div class="app-bg" :style="{ backgroundImage: `url(${appBgUrl})` }"></div>
+  <div class="account-switch">
+    <el-button type="default" class="account-btn" title="退出系统" aria-label="退出系统" @click="switchAccount">
+      退出系统
+    </el-button>
+  </div>
+  <div id="container"></div>
   <div class="page">
-    <div class="left">
-      <div id="container"></div>
-      <div class="ground-shadow" aria-hidden="true"></div>
-    </div>
+    
 
-    <div class="right">
-      <!-- <transition name="fade-scale"
-        ><div v-if="showBegin && !showSurvey && !showResult" class="modal-overlay begin-overlay">
-          <div class="begin-modal">
-            <div class="begin-title">hi~我是抱抱，芳香教室专属助理，请问您是来</div>
-            <div class="begin-actions">
-              <el-button type="primary" @click="startSurvey"> 体验课程 </el-button>
-              <el-button @click="handleInspectionClick"> 日常巡检 </el-button>
-              <el-button @click="startChat"> 进行聊天 </el-button>
-            </div>
+    <transition name="fade-scale">
+      <div v-if="showCourseSelect" class="modal-overlay">
+        <div class="course-modal">
+          <div class="course-modal-header">
+            <h2>请选择体验的课程</h2>
+            <el-button @click="backToBegin"> 返回上一步 </el-button>
           </div>
-        </div></transition
-      > -->
-
-      <transition name="fade-scale">
-        <div v-if="showCourseSelect" class="modal-overlay">
-          <div class="course-modal">
-            <div class="course-modal-header">
-              <h2>请选择体验的课程</h2>
-              <el-button @click="backToBegin"> 返回上一步 </el-button>
-            </div>
-            <div class="course-list">
-              <div
-                class="course-card"
-                :class="{ disabled: !course.video_url }"
-                v-for="course in 课程data"
-                :key="course.id"
-                @click="chooseCourse(course)"
-              >
-                <div class="cover" v-if="course.cover_url">
-                  <img :src="course.cover_url" alt="cover" />
-                </div>
-                <div class="info">
-                  <div class="title">{{ course.title }}</div>
-                  <div class="desc">{{ course.description || '暂无描述' }}</div>
-                  <div class="tip" v-if="!course.video_url">
-                    无视频，暂不可体验
-                  </div>
+          <div class="course-list">
+            <div
+              class="course-card"
+              :class="{ disabled: !course.video_url }"
+              v-for="course in 课程data"
+              :key="course.id"
+              @click="chooseCourse(course)"
+            >
+              <div class="cover" v-if="course.cover_url">
+                <img :src="course.cover_url" alt="cover" />
+              </div>
+              <div class="info">
+                <div class="title">{{ course.title }}</div>
+                <div class="desc">{{ course.description || '暂无描述' }}</div>
+                <div class="tip" v-if="!course.video_url">
+                  无视频，暂不可体验
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </transition>
+      </div>
+    </transition>
 
-      <transition name="fade-scale">
-        <div
-          v-if="playingVideo && selectedCourse"
-          class="modal-overlay"
-          @click.self="closeVideo"
-        >
-          <div class="video-modal">
+    <transition name="fade-scale">
+      <div
+        v-if="playingVideo && selectedCourse"
+        class="modal-overlay"
+        @click.self="closeVideo"
+      >
+        <div class="video-modal">
+          <el-button
+            class="close-circle"
+            @click="closeVideo"
+            aria-label="关闭视频"
+            title="关闭"
+          >
+            ×
+          </el-button>
+          <video
+            :key="selectedCourse.id"
+            :src="selectedCourse.video_url!"
+            controls
+            autoplay
+            muted
+            playsinline
+            preload="metadata"
+            @ended="onVideoEnded"
+            @error="onVideoError"
+          ></video>
+        </div>
+      </div>
+    </transition>
+
+    <audio
+      ref="audioEl"
+      style="display: none"
+      @ended="isMusicPlaying = false"
+      @error="isMusicPlaying = false"
+    ></audio>
+
+    <transition name="fade-scale">
+      <div
+        v-if="showSurveyThemeSelect"
+        class="modal-overlay top-overlay survey-overlay"
+        @click.self="closeSurveyPick"
+      >
+        <div class="survey-dialog">
+          <div class="dialog-header">
+            <h3>测评</h3>
             <el-button
               class="close-circle"
-              @click="closeVideo"
-              aria-label="关闭视频"
+              @click="closeSurveyPick"
+              aria-label="关闭"
               title="关闭"
+              >×</el-button
             >
-              ×
-            </el-button>
-            <video
-              :key="selectedCourse.id"
-              :src="selectedCourse.video_url!"
-              controls
-              autoplay
-              muted
-              playsinline
-              preload="metadata"
-              @ended="onVideoEnded"
-              @error="onVideoError"
-            ></video>
+          </div>
+          <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
+          <div class="dialog-list">
+            <button
+              class="dialog-item"
+              :class="{ selected: selectedSurveyId === s.id }"
+              v-for="s in surveys"
+              :key="s.id"
+              @click="selectedSurveyId = s.id"
+            >
+              <span class="item-text">{{ s.theme || '未命名问卷' }}</span>
+            </button>
+          </div>
+          <div class="dialog-actions">
+            <el-button
+              type="primary"
+              :disabled="!selectedSurveyId"
+              @click="startSurveyPick"
+              >开始测评</el-button
+            >
           </div>
         </div>
-      </transition>
+      </div>
+    </transition>
 
-      <audio
-        ref="audioEl"
-        style="display: none"
-        @ended="isMusicPlaying = false"
-        @error="isMusicPlaying = false"
-      ></audio>
-
-      <transition name="fade-scale">
-        <div
-          v-if="showSurveyThemeSelect"
-          class="modal-overlay top-overlay survey-overlay"
-          @click.self="closeSurveyPick"
-        >
-          <div class="survey-dialog">
-            <div class="dialog-header">
-              <h3>测评</h3>
+    <transition name="fade-scale">
+      <div v-if="showSurvey && !showResult" class="modal-overlay">
+        <div class="survey-container">
+          <div class="survey-header">
+            <h2>问卷答题</h2>
+            <div class="header-right">
+              <div class="progress">
+                题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
+              </div>
               <el-button
                 class="close-circle"
-                @click="closeSurveyPick"
+                @click="goHome"
                 aria-label="关闭"
                 title="关闭"
                 >×</el-button
               >
             </div>
-            <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
-            <div class="dialog-list">
-              <button
-                class="dialog-item"
-                :class="{ selected: selectedSurveyId === s.id }"
-                v-for="s in surveys"
-                :key="s.id"
-                @click="selectedSurveyId = s.id"
+          </div>
+
+          <div class="question-card">
+            <h3>{{ currentQuestion.text }}</h3>
+
+            <div class="options">
+              <div
+                v-for="(option, index) in currentQuestion.options"
+                :key="index"
+                class="option"
+                :class="{
+                  selected: selectedIndex[currentQuestionIndex] === index,
+                }"
+                @click="selectAnswer(index, option.value)"
               >
-                <span class="item-text">{{ s.theme || '未命名问卷' }}</span>
-              </button>
+                <span class="option-label">{{
+                  String.fromCharCode(65 + index)
+                }}</span>
+                <span class="option-text">{{ option.text }}</span>
+                <span class="option-value">{{ option.value }}分</span>
+              </div>
             </div>
-            <div class="dialog-actions">
+
+            <div class="navigation">
+              <el-button
+                @click="prevQuestion"
+                :disabled="currentQuestionIndex === 0"
+                >上一题</el-button
+              >
+
               <el-button
                 type="primary"
-                :disabled="!selectedSurveyId"
-                @click="startSurveyPick"
-                >开始测评</el-button
+                @click="nextQuestion"
+                :disabled="selectedIndex[currentQuestionIndex] === undefined"
+                >{{ isLastQuestion ? '提交' : '下一题' }}</el-button
               >
             </div>
           </div>
         </div>
-      </transition>
+      </div>
+    </transition>
 
-      <transition name="fade-scale">
-        <div v-if="showSurvey && !showResult" class="modal-overlay">
-          <div class="survey-container">
-            <div class="survey-header">
-              <h2>问卷答题</h2>
-              <div class="header-right">
-                <div class="progress">
-                  题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
-                </div>
-                <el-button
-                  class="close-circle"
-                  @click="goHome"
-                  aria-label="关闭"
-                  title="关闭"
-                  >×</el-button
-                >
-              </div>
-            </div>
-
-            <div class="question-card">
-              <h3>{{ currentQuestion.text }}</h3>
-
-              <div class="options">
-                <div
-                  v-for="(option, index) in currentQuestion.options"
-                  :key="index"
-                  class="option"
-                  :class="{
-                    selected: selectedIndex[currentQuestionIndex] === index,
-                  }"
-                  @click="selectAnswer(index, option.value)"
-                >
-                  <span class="option-label">{{
-                    String.fromCharCode(65 + index)
-                  }}</span>
-                  <span class="option-text">{{ option.text }}</span>
-                  <span class="option-value">{{ option.value }}分</span>
-                </div>
-              </div>
-
-              <div class="navigation">
-                <el-button
-                  @click="prevQuestion"
-                  :disabled="currentQuestionIndex === 0"
-                  >上一题</el-button
-                >
-
-                <el-button
-                  type="primary"
-                  @click="nextQuestion"
-                  :disabled="selectedIndex[currentQuestionIndex] === undefined"
-                  >{{ isLastQuestion ? '提交' : '下一题' }}</el-button
-                >
-              </div>
-            </div>
+    <transition name="fade-scale">
+      <div v-if="showResult" class="result-container">
+        <div class="result-card">
+          <div class="result-summary">
+            <span class="result-prefix">根据您的情况</span>
+            <span class="grade-badge">{{
+              getGrade(totalScore)?.label || ''
+            }}</span>
+          </div>
+          <div class="result-actions">
+            <el-button type="primary" @click="restartSurvey">
+              重新评测
+            </el-button>
+            <el-button type="primary" @click="closeResultModal">继续</el-button>
           </div>
         </div>
-      </transition>
-
-      <transition name="fade-scale">
-        <div v-if="showResult" class="result-container">
-          <div class="result-card">
-            <div class="result-summary">
-              <span class="result-prefix">根据您的情况</span>
-              <span class="grade-badge">{{
-                getGrade(totalScore)?.label || ''
-              }}</span>
-            </div>
-            <div class="result-actions">
-              <el-button type="primary" @click="restartSurvey">
-                重新评测
-              </el-button>
-              <el-button type="primary" @click="closeResultModal"
-                >继续</el-button
-              >
-            </div>
-          </div>
-        </div>
-      </transition>
-    </div>
+      </div>
+    </transition>
   </div>
   <el-button
     class="voice-button"
@@ -1081,100 +1047,26 @@ const appBgUrl = appBg as any as string
 }
 
 .page {
-  display: grid;
-  grid-template-columns: var(--leftWidth) 1fr;
-  gap: clamp(16px, 4vw, 32px);
-  max-width: 1280px;
+  position: relative;
+  width: 100%;
   margin: 0 auto;
   padding: 16px;
-  align-items: center;
-  justify-content: center;
-  --leftWidth: 340px;
 }
 
-.left {
-  width: var(--leftWidth);
-  position: relative;
-  min-height: 72vh;
-}
-
-.right {
-  position: relative;
-  min-width: clamp(560px, 48vw, 980px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 80vh;
-}
+/* 移除 left/right 布局，数字人独立为固定定位容器 */
 
 #container {
   position: fixed;
-  left: 15%;
-  bottom: 15%;
-  width: 500px;
-  height: clamp(46vh, 56vh, 64vh);
+  left: 50%;
+  top: 60%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  height: 80%;
   z-index: 1;
 }
 
-.ground-shadow {
-  position: fixed;
-  left: 26px;
-  bottom: 14px;
-  width: clamp(220px, 20vw, 320px);
-  height: 18px;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0.22) 0%,
-    rgba(0, 0, 0, 0.12) 42%,
-    rgba(0, 0, 0, 0) 72%
-  );
-  border-radius: 9999px;
-  pointer-events: none;
-  z-index: 0;
-}
+ 
 
-.begin span {
-  cursor: pointer;
-  color: blue;
-  border: 1px solid blue;
-  border-radius: 5px;
-  padding: 2px;
-}
-
-.begin-modal {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.12);
-  padding: 32px;
-  max-width: 640px;
-  width: 100%;
-  text-align: center;
-}
-
-.begin-title {
-  color: #111827;
-  margin-bottom: 20px;
-  font-size: 22px;
-  line-height: 1.6;
-  font-weight: 600;
-}
-
-.begin-actions {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.begin-actions :deep(.el-button) {
-  padding: 12px 18px;
-  border-radius: 10px;
-  min-width: 140px;
-}
-
-.begin-actions :deep(.el-button--primary) {
-  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
-}
 
 .course-modal {
   background: #fff;
@@ -1301,71 +1193,6 @@ const appBgUrl = appBg as any as string
   z-index: 2;
 }
 
-.video-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  font-size: 22px;
-  line-height: 1;
-  z-index: 2;
-}
-
-.video-close:hover {
-  background: rgba(0, 0, 0, 0.75);
-  transform: scale(1.05);
-}
-
-.video-close:focus {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
-}
-
-.video-close:active {
-  transform: scale(0.98);
-}
-
-.audio-bar {
-}
-
-.audio-bar audio {
-}
-
-.modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  font-size: 22px;
-  line-height: 1;
-  z-index: 2;
-}
-
-.modal-close:hover {
-  background: rgba(0, 0, 0, 0.75);
-  transform: scale(1.05);
-}
-
 .top-overlay {
   align-items: flex-start;
   padding-top: 12px;
@@ -1377,17 +1204,7 @@ const appBgUrl = appBg as any as string
   -webkit-backdrop-filter: saturate(130%) blur(1.5px);
 }
 
-.picker-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 1400;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: saturate(130%) blur(1.5px);
-}
+
 
 .survey-dialog {
   background: #fff;
@@ -1723,10 +1540,7 @@ const appBgUrl = appBg as any as string
   background: rgba(255, 255, 255, 0.08);
 }
 
-.begin-overlay {
-  align-items: flex-start;
-  padding-top: clamp(80px, 18vh, 200px);
-}
+ 
 
 .result-summary {
   display: flex;
@@ -1953,6 +1767,21 @@ const appBgUrl = appBg as any as string
   z-index: 1;
 }
 
+.account-switch {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1600;
+}
+.account-btn {
+  background: #fff;
+  color: #8b5cf6;
+  border-color: #fff;
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+
 .banner {
   position: fixed;
   top: 24px;
@@ -2146,66 +1975,7 @@ const appBgUrl = appBg as any as string
   overflow: hidden;
 }
 
-@media (max-width: 480px) {
-  .result-summary {
-    gap: 8px;
-    padding: 10px 12px;
-  }
-
-  .result-prefix,
-  .grade-badge {
-    font-size: 16px;
-  }
-}
-
-@media (max-width: 960px) {
-  .page {
-    grid-template-columns: 1fr;
-    gap: 12px;
-    align-items: center;
-    justify-content: center;
-    --leftWidth: 300px;
-  }
-
-  .left {
-    width: var(--leftWidth);
-    position: static;
-    min-height: auto;
-  }
-
-  #container {
-    position: fixed;
-    left: 15%;
-    bottom: 15%;
-    width: 500px;
-    height: clamp(40vh, 48vh, 56vh);
-  }
-
-  .ground-shadow {
-    position: fixed;
-    left: 18px;
-    bottom: 10px;
-    width: clamp(200px, 36vw, 260px);
-    display: block;
-  }
-}
-
-.right {
-  min-width: auto;
-  width: 100%;
-  min-height: auto;
-  align-items: flex-start;
-  padding-top: clamp(24px, 10vh, 80px);
-}
-
-.result-container {
-  width: clamp(520px, 36vw, 640px);
-  margin: 0 auto;
-}
-
-.modal-overlay {
-  align-items: flex-start;
-}
+ 
 
 .survey-overlay {
   background: rgba(255, 255, 255, 0.14);
