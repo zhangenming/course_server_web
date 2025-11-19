@@ -21,6 +21,146 @@ const rememberMe = ref(false)
 const usernameError = ref('')
 const passwordError = ref('')
 
+const activeAuth = ref<'admin' | 'student'>('admin')
+const studentTab = ref<'login' | 'register'>('login')
+const isHttps = computed(() => typeof location !== 'undefined' && location.protocol === 'https:')
+const maskPhone = (s: string) => {
+  const v = String(s || '')
+  if (v.length < 7) return v
+  return v.slice(0, 3) + '****' + v.slice(-4)
+}
+
+const studentPhone = ref('')
+const studentPhoneError = ref('')
+const studentLoginLoading = ref(false)
+const validateStudentPhone = () => {
+  const p = studentPhone.value.trim()
+  if (!p) {
+    studentPhoneError.value = '请输入手机号'
+    return false
+  }
+  const ok = /^1[3-9]\d{9}$/.test(p)
+  if (!ok) {
+    studentPhoneError.value = '手机号格式不正确'
+    return false
+  }
+  studentPhoneError.value = ''
+  return true
+}
+const isStudentLoginValid = computed(() => /^1[3-9]\d{9}$/.test(studentPhone.value.trim()))
+const submitStudentLogin = async () => {
+  if (studentLoginLoading.value) return
+  const ok = validateStudentPhone()
+  if (!ok) return
+  if (!isHttps.value) {
+    notify('请在 HTTPS 环境下提交')
+    return
+  }
+  studentLoginLoading.value = true
+  try {
+    const data = await apiJson('commons/login_alt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: null, phone: studentPhone.value.trim() }),
+    })
+    const token = (data as any)?.token || (data as any)?.data?.token
+    if (token) {
+      ;(window as any).token = token
+      localStorage.token = token
+      setTimeout(() => { location.reload() }, 500)
+    } else {
+      const msg = (data as any)?.messgae || (data as any)?.message
+      notify(msg || '登录失败')
+    }
+  } catch (e: any) {
+    notify(e?.message || '网络错误')
+  } finally {
+    studentLoginLoading.value = false
+  }
+}
+
+const regUsername = ref('')
+const regRole = ref('student')
+const regGender = ref<'男' | '女'>('男')
+const regPhone = ref('')
+const regPassword = ref('admin123')
+const regUsernameError = ref('')
+const regRoleError = ref('')
+const regGenderError = ref('')
+const regPhoneError = ref('')
+const studentRegisterLoading = ref(false)
+const validateRegUsername = () => {
+  const u = regUsername.value.trim()
+  if (!u) { regUsernameError.value = '请输入用户名'; return false }
+  if (u.length < 3 || u.length > 50) { regUsernameError.value = '用户名长度为3-50'; return false }
+  regUsernameError.value = ''
+  return true
+}
+const validateRegRole = () => {
+  const r = String(regRole.value || '')
+  if (!r) { regRoleError.value = '请选择角色'; return false }
+  regRoleError.value = ''
+  return true
+}
+const validateRegGender = () => {
+  const g = String(regGender.value || '')
+  if (!g) { regGenderError.value = '请选择性别'; return false }
+  regGenderError.value = ''
+  return true
+}
+const validateRegPhone = () => {
+  const p = regPhone.value.trim()
+  if (!p) { regPhoneError.value = '请输入手机号'; return false }
+  if (!/^1[3-9]\d{9}$/.test(p)) { regPhoneError.value = '手机号格式不正确'; return false }
+  regPhoneError.value = ''
+  return true
+}
+const isRegisterValid = computed(() => {
+  const u = regUsername.value.trim()
+  const p = regPhone.value.trim()
+  return u.length >= 3 && u.length <= 50 && /^1[3-9]\d{9}$/.test(p) && !!regRole.value && !!regGender.value
+})
+
+const roleDialogVisible = ref(false)
+const openRoleDialog = () => {
+  roleDialogVisible.value = true
+}
+const selectRole = (val: 'student' | 'teacher') => {
+  regRole.value = val
+  roleDialogVisible.value = false
+  validateRegRole()
+}
+const submitStudentRegister = async () => {
+  if (studentRegisterLoading.value) return
+  const a = validateRegUsername()
+  const b = validateRegRole()
+  const c = validateRegGender()
+  const d = validateRegPhone()
+  if (!(a && b && c && d)) return
+  if (!isHttps.value) {
+    notify('请在 HTTPS 环境下提交')
+    return
+  }
+  studentRegisterLoading.value = true
+  try {
+    const body = JSON.stringify({
+      username: regUsername.value.trim(),
+      password: regPassword.value,
+      role: regRole.value,
+      gender: regGender.value,
+      phone: regPhone.value.trim(),
+    })
+    const data = await apiJson('api/v1/users/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+    notify('注册成功：' + maskPhone(regPhone.value.trim()))
+    studentTab.value = 'login'
+    studentPhone.value = regPhone.value.trim()
+  } catch (e: any) {
+    notify(e?.message || '网络错误')
+  } finally {
+    studentRegisterLoading.value = false
+  }
+}
+
 let hideTimer: number | undefined
 
 const notify = (msg: string) => {
@@ -142,15 +282,20 @@ const socialLogin = (provider: string) => {
       </div>
 
       <div class="login-card">
+        <div class="auth-switch">
+          <button type="button" class="switch-btn" :class="{ active: activeAuth === 'admin' }" @click="activeAuth = 'admin'">管理员登录</button>
+          <button type="button" class="switch-btn" :class="{ active: activeAuth === 'student' }" @click="activeAuth = 'student'">学员登录/注册</button>
+        </div>
         <div class="card-header">
           <div class="logo">
             <img src="/src/assets/logomini.png" alt="Logo" class="logo-image" />
           </div>
           <h1 class="card-title">欢迎回来</h1>
-          <p class="card-subtitle">请登录您的管理员账户</p>
+          <p class="card-subtitle" v-if="activeAuth === 'admin'">请登录您的管理员账户</p>
+          <p class="card-subtitle" v-else>请选择学员登录或注册</p>
         </div>
 
-        <form class="login-form" @submit.prevent="submit">
+        <form v-if="activeAuth === 'admin'" class="login-form" @submit.prevent="submit">
           <div class="form-group" :class="{ 'has-error': usernameError }">
             <label for="username" class="form-label">
               <el-icon><User /></el-icon>
@@ -241,6 +386,178 @@ const socialLogin = (provider: string) => {
           </button>
         </form>
 
+        <div v-else class="login-form">
+          <div class="sub-switch">
+            <button type="button" class="switch-btn" :class="{ active: studentTab === 'login' }" @click="studentTab = 'login'">登录</button>
+            <button type="button" class="switch-btn" :class="{ active: studentTab === 'register' }" @click="studentTab = 'register'">注册</button>
+          </div>
+
+          <div v-if="studentTab === 'login'">
+            <div class="form-group" :class="{ 'has-error': studentPhoneError }">
+              <label for="student-phone" class="form-label">
+                <el-icon><User /></el-icon>
+                手机号
+              </label>
+              <div class="input-wrapper">
+                <input
+                  id="student-phone"
+                  v-model="studentPhone"
+                  type="tel"
+                  inputmode="numeric"
+                  class="form-input"
+                  placeholder="请输入手机号"
+                  :class="{ 'input-error': studentPhoneError }"
+                  @blur="validateStudentPhone"
+                  @keyup.enter="isStudentLoginValid && submitStudentLogin()"
+                  autocomplete="tel"
+                />
+                <div v-if="studentPhone && !studentPhoneError" class="input-icon success">
+                  <el-icon><CircleCheck /></el-icon>
+                </div>
+              </div>
+              <div v-if="studentPhoneError" class="error-message">
+                <el-icon><Warning /></el-icon>
+                {{ studentPhoneError }}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="submit-button"
+              :disabled="studentLoginLoading || !isStudentLoginValid"
+              :class="{ loading: studentLoginLoading }"
+              @click="submitStudentLogin"
+            >
+              <span v-if="!studentLoginLoading">学员登录</span>
+              <span v-else class="loading-text">
+                <span class="spinner"></span>
+                登录中...
+              </span>
+            </button>
+          </div>
+
+          <div v-else>
+            <div class="form-group" :class="{ 'has-error': regUsernameError }">
+              <label for="reg-username" class="form-label">
+                <el-icon><User /></el-icon>
+                用户名
+              </label>
+              <div class="input-wrapper">
+                <input
+                  id="reg-username"
+                  v-model="regUsername"
+                  type="text"
+                  class="form-input"
+                  placeholder="请输入用户名（3-50）"
+                  :class="{ 'input-error': regUsernameError }"
+                  @blur="validateRegUsername"
+                  autocomplete="username"
+                />
+              </div>
+              <div v-if="regUsernameError" class="error-message">
+                <el-icon><Warning /></el-icon>
+                {{ regUsernameError }}
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-password" class="form-label">
+                <el-icon><Lock /></el-icon>
+                密码（固定）
+              </label>
+              <div class="input-wrapper">
+                <input id="reg-password" v-model="regPassword" type="password" class="form-input" disabled />
+              </div>
+            </div>
+
+            <div class="form-group" :class="{ 'has-error': regRoleError }">
+              <label class="form-label">角色</label>
+              <div class="input-wrapper">
+                <button type="button" class="form-input role-display" @click="openRoleDialog" aria-haspopup="dialog" :aria-label="'当前角色：' + (regRole === 'student' ? '学生' : '老师')">
+                  <span class="role-text">{{ regRole === 'student' ? '学生' : '老师' }}</span>
+                  <span class="role-arrow" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div v-if="regRoleError" class="error-message">
+                <el-icon><Warning /></el-icon>
+                {{ regRoleError }}
+              </div>
+
+              <el-dialog v-model="roleDialogVisible" title="选择角色" width="360px" :close-on-click-modal="true" :close-on-press-escape="true">
+                <div class="role-grid">
+                  <button type="button" class="role-card" :class="{ active: regRole === 'student' }" @click="selectRole('student')">
+                    <span class="role-card-title">学生</span>
+                    <span class="role-card-desc">用于学员登录与学习记录</span>
+                  </button>
+                  <button type="button" class="role-card" :class="{ active: regRole === 'teacher' }" @click="selectRole('teacher')">
+                    <span class="role-card-title">老师</span>
+                    <span class="role-card-desc">用于教师登录与教学管理</span>
+                  </button>
+                </div>
+                <template #footer>
+                  <el-button @click="roleDialogVisible = false">取消</el-button>
+                </template>
+              </el-dialog>
+            </div>
+
+            <div class="form-group" :class="{ 'has-error': regGenderError }">
+              <label class="form-label">性别</label>
+              <div class="gender-row">
+                <label class="radio">
+                  <input type="radio" value="男" v-model="regGender" @change="validateRegGender" />
+                  男
+                </label>
+                <label class="radio">
+                  <input type="radio" value="女" v-model="regGender" @change="validateRegGender" />
+                  女
+                </label>
+              </div>
+              <div v-if="regGenderError" class="error-message">
+                <el-icon><Warning /></el-icon>
+                {{ regGenderError }}
+              </div>
+            </div>
+
+            <div class="form-group" :class="{ 'has-error': regPhoneError }">
+              <label for="reg-phone" class="form-label">
+                <el-icon><User /></el-icon>
+                手机号
+              </label>
+              <div class="input-wrapper">
+                <input
+                  id="reg-phone"
+                  v-model="regPhone"
+                  type="tel"
+                  inputmode="numeric"
+                  class="form-input"
+                  placeholder="请输入手机号"
+                  :class="{ 'input-error': regPhoneError }"
+                  @blur="validateRegPhone"
+                  autocomplete="tel"
+                />
+              </div>
+              <div v-if="regPhoneError" class="error-message">
+                <el-icon><Warning /></el-icon>
+                {{ regPhoneError }}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="submit-button"
+              :disabled="studentRegisterLoading || !isRegisterValid"
+              :class="{ loading: studentRegisterLoading }"
+              @click="submitStudentRegister"
+            >
+              <span v-if="!studentRegisterLoading">注册</span>
+              <span v-else class="loading-text">
+                <span class="spinner"></span>
+                注册中...
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div class="divider">
           <span class="divider-text">或使用以下方式登录</span>
         </div>
@@ -269,9 +586,55 @@ const socialLogin = (provider: string) => {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   background-size: 400% 400%;
   animation: gradientShift 15s ease infinite;
-  padding: 20px;
+  /* padding: 20px; */
   position: relative;
   overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  /* Dynamic scaling variables */
+  --scale-factor: clamp(0.8, 1vw + 1vh, 2);
+  --base-font-size: clamp(14px, 1.2vw, 24px);
+  --base-padding: clamp(12px, 1.5vw, 24px);
+  --base-margin: clamp(8px, 1vw, 16px);
+  /* Ultra HD scaling */
+  --ultra-hd-scale: 1;
+  --ultra-hd-font-scale: 1;
+  --ultra-hd-spacing-scale: 1;
+}
+
+/* Dynamic scaling based on viewport dimensions */
+@media (min-width: 1920px) and (min-height: 1080px) {
+  .login-page {
+    --ultra-hd-scale: 1.2;
+    --ultra-hd-font-scale: 1.3;
+    --ultra-hd-spacing-scale: 1.2;
+  }
+}
+
+@media (min-width: 2560px) and (min-height: 1440px) {
+  .login-page {
+    --ultra-hd-scale: 1.5;
+    --ultra-hd-font-scale: 1.6;
+    --ultra-hd-spacing-scale: 1.5;
+  }
+}
+
+@media (min-width: 3840px) and (min-height: 2160px) {
+  .login-page {
+    --ultra-hd-scale: 2;
+    --ultra-hd-font-scale: 2.2;
+    --ultra-hd-spacing-scale: 2;
+  }
+}
+
+@media (min-width: 7680px) and (min-height: 4320px) {
+  .login-page {
+    --ultra-hd-scale: 3;
+    --ultra-hd-font-scale: 3.5;
+    --ultra-hd-spacing-scale: 3;
+  }
 }
 
 .login-page::before {
@@ -302,7 +665,29 @@ const socialLogin = (provider: string) => {
   z-index: 2;
   width: 100%;
   max-width: 420px;
+  /* Dynamic scaling */
+  font-size: var(--base-font-size);
+  padding: var(--base-padding);
+  /* Ultra HD scaling support */
+  transform: scale(var(--ultra-hd-scale, 1));
+  transform-origin: center;
+  transition: transform 0.3s ease;
 }
+
+.role-display { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+.role-text { color: #374151; }
+.role-arrow { width: 20px; height: 20px; background-repeat: no-repeat; background-position: center; background-size: 20px 20px; opacity: .8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.has-error .role-display { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.1); }
+.has-error .role-display:focus { border-color: #dc2626; }
+
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.role-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; cursor: pointer; transition: all .2s ease; text-align: left; }
+.role-card:hover { border-color: #d1d5db; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.06); }
+.role-card.active { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
+.role-card-title { font-weight: 600; color: #111827; }
+.role-card-desc { font-size: 12px; color: #6b7280; }
 
 .banner {
   position: fixed;
@@ -345,6 +730,55 @@ const socialLogin = (provider: string) => {
   animation: fadeInUp 0.6s ease-out;
 }
 
+.auth-switch { display: flex; gap: 6px; background: #f3f4f6; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.switch-btn { flex: 1; border: none; background: transparent; color: #6b7280; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s ease; }
+.switch-btn:hover { color: #4b5563; }
+.switch-btn.active { background: #ffffff; color: #667eea; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.sub-switch { display: flex; gap: 6px; background: #f3f4f6; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.sub-switch .switch-btn { font-size: 13px; }
+.sub-switch .switch-btn.active { background: #ffffff; color: #667eea; }
+.gender-row { display: flex; gap: 16px; align-items: center; }
+.radio { display: flex; align-items: center; gap: 6px; color: #374151; cursor: pointer; }
+.radio input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  accent-color: #10b981;
+}
+.radio input[type="radio"]:hover {
+  transform: scale(1.1);
+}
+.radio input[type="radio"]:focus {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* 现代下拉框样式 */
+.select-wrapper { position: relative; }
+.modern-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 12px 44px 12px 16px;
+  font-size: var(--base-font-size);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 20px 20px;
+}
+.modern-select:hover { border-color: #d1d5db; background-color: #ffffff; }
+.modern-select:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
+.modern-select:disabled { cursor: not-allowed; opacity: .6; }
+
+.has-error .modern-select { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.1); }
+.has-error .modern-select:focus { border-color: #dc2626; }
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -368,14 +802,17 @@ const socialLogin = (provider: string) => {
 }
 
 .logo-image {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
   object-fit: contain;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   animation: float 3s ease-in-out infinite;
-  padding: 8px;
+  padding: 6px;
+  display: block;
+  margin: 0 auto;
 }
 
 @keyframes float {
@@ -730,6 +1167,21 @@ const socialLogin = (provider: string) => {
     font-size: 24px;
   }
 
+  .logo-image {
+    width: 64px;
+    height: 64px;
+  }
+
+  .auth-switch {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .switch-btn {
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
   .social-login {
     gap: 8px;
   }
@@ -738,10 +1190,441 @@ const socialLogin = (provider: string) => {
     padding: 12px 8px;
   }
 
-  .form-options {
-    flex-direction: column;
+  .login-page {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-card {
+    padding: 24px 16px;
+  }
+
+  .card-title {
+    font-size: 20px;
+  }
+
+  .logo-image {
+    width: 56px;
+    height: 56px;
+  }
+
+  .form-input {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .submit-button {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .login-container {
+    max-width: 380px;
+  }
+
+  .login-card {
+    padding: 36px 28px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .login-container {
+    max-width: 400px;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .login-container {
+    max-width: 440px;
+  }
+}
+
+@media (min-width: 1441px) and (max-width: 1920px) {
+  .login-container {
+    max-width: 480px;
+  }
+
+  .login-card {
+    padding: 48px;
+  }
+
+  .card-title {
+    font-size: 32px;
+  }
+
+  .logo-image {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+/* Ultra HD Support - 2160x3840 and above */
+@media (min-width: 2160px) and (min-height: 3840px) {
+  :root {
+    --ultra-hd-scale: 1.5;
+    --ultra-hd-font-scale: 1.8;
+    --ultra-hd-spacing-scale: 1.6;
+  }
+  
+  .login-container {
+    max-width: 800px;
+    transform: scale(var(--ultra-hd-scale));
+    transform-origin: center;
+    /* Enhanced scaling for ultra-high resolution */
+    zoom: 1.2;
+  }
+
+  .login-card {
+    padding: 80px;
+    border-radius: 48px;
+  }
+
+  .card-title {
+    font-size: 56px;
+    margin-bottom: 24px;
+  }
+
+  .card-subtitle {
+    font-size: 28px;
+    margin-bottom: 48px;
+  }
+
+  .logo-image {
+    width: 160px;
+    height: 160px;
+    margin-bottom: 32px;
+  }
+
+  .form-label {
+    font-size: 24px;
+    margin-bottom: 16px;
+  }
+
+  .form-input {
+    padding: 24px 32px;
+    font-size: 28px;
+    border-radius: 16px;
+  }
+
+  .submit-button {
+    padding: 28px 48px;
+    font-size: 32px;
+    border-radius: 16px;
+  }
+
+  .auth-switch {
+    margin-bottom: 32px;
+    padding: 8px;
+    border-radius: 20px;
+  }
+
+  .switch-btn {
+    padding: 20px 24px;
+    font-size: 24px;
+    border-radius: 16px;
+  }
+
+  .sub-switch {
+    margin-bottom: 32px;
+    padding: 8px;
+    border-radius: 20px;
+  }
+
+  .gender-row {
+    gap: 32px;
+  }
+
+  .radio {
+    font-size: 24px;
     gap: 12px;
-    align-items: flex-start;
+  }
+
+  .radio input[type="radio"] {
+    width: 28px;
+    height: 28px;
+  }
+
+  .modern-select { font-size: 28px; padding: 24px 56px 24px 20px; border-radius: 16px; background-size: 24px 24px; }
+
+  .error-message {
+    font-size: 20px;
+    margin-top: 12px;
+  }
+
+  .divider {
+    margin: 48px 0;
+  }
+
+  .divider-text {
+    font-size: 24px;
+    padding: 0 24px;
+  }
+
+  .social-login {
+    gap: 24px;
+  }
+
+  .social-button {
+    padding: 32px 24px;
+    font-size: 20px;
+    border-radius: 16px;
+  }
+
+  .social-icon {
+    font-size: 32px;
+  }
+
+  .login-footer {
+    margin-top: 48px;
+  }
+
+  .footer-text {
+    font-size: 22px;
+  }
+
+  .link-button {
+    font-size: 22px;
+    padding: 8px 16px;
+  }
+
+  .banner {
+    top: 48px;
+    padding: 24px 32px;
+    border-radius: 20px;
+    font-size: 24px;
+  }
+}
+
+/* 4K and above support */
+@media (min-width: 3840px) and (min-height: 2160px) {
+  .login-container {
+    max-width: 1000px;
+    transform: scale(2);
+    transform-origin: center;
+    /* Enhanced scaling for 4K+ resolution */
+    zoom: 1.5;
+  }
+
+  .login-card {
+    padding: 120px;
+    border-radius: 64px;
+  }
+
+  .card-title {
+    font-size: 72px;
+    margin-bottom: 32px;
+  }
+
+  .card-subtitle {
+    font-size: 36px;
+    margin-bottom: 64px;
+  }
+
+  .logo-image {
+    width: 200px;
+    height: 200px;
+    margin-bottom: 48px;
+  }
+
+  .form-label {
+    font-size: 32px;
+    margin-bottom: 20px;
+  }
+
+  .form-input {
+    padding: 32px 40px;
+    font-size: 36px;
+    border-radius: 20px;
+  }
+
+  .submit-button {
+    padding: 36px 60px;
+    font-size: 40px;
+    border-radius: 20px;
+  }
+
+  .auth-switch {
+    margin-bottom: 48px;
+    padding: 12px;
+    border-radius: 24px;
+  }
+
+  .switch-btn {
+    padding: 24px 32px;
+    font-size: 28px;
+    border-radius: 20px;
+  }
+
+  .sub-switch {
+    margin-bottom: 48px;
+    padding: 12px;
+    border-radius: 24px;
+  }
+
+  .gender-row {
+    gap: 48px;
+  }
+
+  .radio {
+    font-size: 32px;
+    gap: 16px;
+  }
+
+  .radio input[type="radio"] {
+    width: 36px;
+    height: 36px;
+  }
+
+  .modern-select { font-size: 36px; padding: 32px 64px 32px 24px; border-radius: 20px; background-size: 28px 28px; }
+
+  .error-message {
+    font-size: 24px;
+    margin-top: 16px;
+  }
+
+  .divider {
+    margin: 64px 0;
+  }
+
+  .divider-text {
+    font-size: 28px;
+    padding: 0 32px;
+  }
+
+  .social-login {
+    gap: 32px;
+  }
+
+  .social-button {
+    padding: 40px 32px;
+    font-size: 24px;
+    border-radius: 20px;
+  }
+
+  .social-icon {
+    font-size: 40px;
+  }
+
+  .login-footer {
+    margin-top: 64px;
+  }
+
+  .footer-text {
+    font-size: 28px;
+  }
+
+  .link-button {
+    font-size: 28px;
+    padding: 12px 20px;
+  }
+
+  .banner {
+    top: 64px;
+    padding: 32px 40px;
+    border-radius: 24px;
+    font-size: 28px;
+  }
+}
+
+/* 8K and extreme resolution support */
+@media (min-width: 7680px) and (min-height: 4320px) {
+  :root {
+    --extreme-scale: 3.5;
+    --extreme-font-scale: 4;
+    --extreme-spacing-scale: 3.5;
+  }
+  
+  .login-container {
+    max-width: 1400px;
+    transform: scale(var(--extreme-scale));
+    zoom: 2;
+  }
+
+  .card-title {
+    font-size: clamp(72px, 5vw, 96px);
+  }
+
+  .card-subtitle {
+    font-size: clamp(36px, 2.5vw, 48px);
+  }
+
+  .logo-image {
+    width: clamp(200px, 15vw, 280px);
+    height: clamp(200px, 15vw, 280px);
+  }
+
+  .form-label {
+    font-size: clamp(32px, 2.5vw, 40px);
+  }
+
+  .form-input {
+    font-size: clamp(36px, 3vw, 48px);
+    padding: clamp(32px, 2.5vw, 40px) clamp(40px, 3vw, 50px);
+  }
+
+  .submit-button {
+    font-size: clamp(40px, 3.5vw, 52px);
+    padding: clamp(36px, 3vw, 48px) clamp(60px, 4vw, 80px);
+  }
+
+  .switch-btn {
+    font-size: clamp(28px, 2.5vw, 36px);
+    padding: clamp(24px, 2vw, 32px) clamp(32px, 2.5vw, 40px);
+  }
+
+  .radio {
+    font-size: clamp(32px, 2.5vw, 40px);
+  }
+
+  .radio input[type="radio"] {
+    width: clamp(36px, 2.5vw, 48px);
+    height: clamp(36px, 2.5vw, 48px);
+  }
+
+  .modern-select {
+    font-size: clamp(36px, 3vw, 48px);
+    padding: clamp(32px, 2.5vw, 40px) clamp(64px, 4vw, 72px);
+    border-radius: 20px;
+    background-size: clamp(24px, 2vw, 32px) clamp(24px, 2vw, 32px);
+  }
+
+  .footer-text {
+    font-size: clamp(28px, 2.5vw, 36px);
+  }
+
+  .link-button {
+    font-size: clamp(28px, 2.5vw, 36px);
+  }
+
+  .banner {
+    font-size: clamp(28px, 2.5vw, 36px);
+    padding: clamp(32px, 2.5vw, 40px) clamp(40px, 3vw, 50px);
+  }
+}
+
+/* Universal scaling for any ultra-high resolution */
+@media (min-width: 4320px) and (min-height: 7680px) {
+  .login-container {
+    max-width: 1800px;
+    transform: scale(4);
+    zoom: 2.5;
+  }
+  
+  .login-card {
+    padding: 160px;
+    border-radius: 80px;
+  }
+  
+  .card-title {
+    font-size: clamp(96px, 6vw, 120px);
+  }
+  
+  .logo-image {
+    width: clamp(320px, 20vw, 400px);
+    height: clamp(320px, 20vw, 400px);
   }
 }
 
@@ -872,7 +1755,39 @@ const socialLogin = (provider: string) => {
   }
 
   .logo-image {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    background: #ffffff;
+    border: 2px solid #475569;
+    width: 80px;
+    height: 80px;
+  }
+
+  .auth-switch { background: #1f2937; }
+  .switch-btn { color: #94a3b8; }
+  .switch-btn:hover { color: #e2e8f0; }
+  .switch-btn.active { background: #334155; color: #818cf8; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+
+  .sub-switch { background: #1f2937; }
+  .sub-switch .switch-btn.active { background: #334155; color: #818cf8; }
+
+  .radio input[type="radio"] {
+    accent-color: #34d399;
+  }
+  .radio input[type="radio"]:hover {
+    transform: scale(1.1);
+  }
+  .radio input[type="radio"]:focus {
+    outline-color: #34d399;
+  }
+
+  .modern-select {
+    background-color: rgba(15, 23, 42, 0.8);
+    border-color: #475569;
+    color: #f1f5f9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  }
+  .modern-select:focus {
+    border-color: #34d399;
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12);
   }
 }
 </style>

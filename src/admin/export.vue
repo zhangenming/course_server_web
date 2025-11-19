@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { apiJson, apiFetch } from '@/utils/request'
+import { SwitchButton } from '@element-plus/icons-vue'
 
 const type = ref<'learning' | 'surveys'>('learning')
 const format = ref<'json' | 'csv'>('json')
@@ -66,7 +67,10 @@ const downloadJson = () => {
           <option value="json">JSON</option>
           <option value="csv">CSV</option>
         </select>
-        <el-button type="primary" :disabled="loading" @click="run">导出</el-button>
+        <el-button type="primary" :disabled="loading" @click="run">
+          <el-icon><SwitchButton /></el-icon>
+          导出
+        </el-button>
         <el-button :disabled="format !== 'json' || preview == null" @click="downloadJson">下载JSON</el-button>
       </div>
     </div>

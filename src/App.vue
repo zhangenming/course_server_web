@@ -8,6 +8,7 @@ import { simulateClick } from './utils'
 import { replys, spks, asks } from './config'
 import { apiJson } from '@/utils/request'
 import appBg from '@/assets/bg.jpg'
+import { SwitchButton } from '@element-plus/icons-vue'
 
 // 移除未使用的首页显示标志
 const showSurvey = ref(false)
@@ -634,6 +635,7 @@ const appBgUrl = appBg as any as string
   <div class="app-bg" :style="{ backgroundImage: `url(${appBgUrl})` }"></div>
   <div class="account-switch">
     <el-button type="default" class="account-btn" title="退出系统" aria-label="退出系统" @click="switchAccount">
+      <el-icon><SwitchButton /></el-icon>
       退出系统
     </el-button>
   </div>
@@ -1754,10 +1756,28 @@ const appBgUrl = appBg as any as string
 .app-bg {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  background-attachment: fixed;
   z-index: 0;
+}
+
+/* 动态缩放与超高分辨率支持 */
+@media (min-width: 2160px) and (min-height: 3840px) {
+  .page { font-size: clamp(18px, 1.6vw, 28px); }
+  #container { width: 85%; height: 85%; }
+  .fab-btn { width: 80px; height: 80px; }
+  .account-btn { padding: 12px 20px; font-size: 16px; }
+}
+
+@media (min-width: 3840px) and (min-height: 2160px) {
+  .page { font-size: clamp(22px, 1.8vw, 36px); }
+  #container { width: 88%; height: 88%; }
+  .fab-btn { width: 88px; height: 88px; }
+  .account-btn { padding: 14px 22px; font-size: 18px; }
 }
 
 .page,
@@ -1779,6 +1799,9 @@ const appBgUrl = appBg as any as string
   border-color: #fff;
   border-radius: 10px;
   padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 
@@ -1807,8 +1830,8 @@ const appBgUrl = appBg as any as string
 }
 
 .fab-btn {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: 9999px;
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: #fff;
@@ -1824,8 +1847,8 @@ const appBgUrl = appBg as any as string
 }
 
 .fab-btn svg {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
 }
 
 .fab-btn:hover {
