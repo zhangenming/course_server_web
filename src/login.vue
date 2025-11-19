@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { apiJson } from '@/utils/request'
 import { apiFetch } from '@/utils/request'
 import { ElIcon } from 'element-plus'
@@ -31,8 +31,22 @@ const maskPhone = (s: string) => {
 }
 
 const studentPhone = ref('')
+const studentUsername = ref('')
 const studentPhoneError = ref('')
+const studentUsernameError = ref('')
 const studentLoginLoading = ref(false)
+const loginMode = ref<'phone' | 'username'>('phone')
+
+// 监听登录模式切换，清空另一种输入
+watch(loginMode, (newMode: 'phone' | 'username') => {
+  if (newMode === 'phone') {
+    studentUsername.value = ''
+    studentUsernameError.value = ''
+  } else {
+    studentPhone.value = ''
+    studentPhoneError.value = ''
+  }
+})
 const validateStudentPhone = () => {
   const p = studentPhone.value.trim()
   if (!p) {
@@ -47,10 +61,39 @@ const validateStudentPhone = () => {
   studentPhoneError.value = ''
   return true
 }
-const isStudentLoginValid = computed(() => /^1[3-9]\d{9}$/.test(studentPhone.value.trim()))
+
+const validateStudentUsername = () => {
+  const u = studentUsername.value.trim()
+  if (!u) {
+    studentUsernameError.value = '请输入用户名'
+    return false
+  }
+  if (u.length < 3 || u.length > 50) {
+    studentUsernameError.value = '用户名长度为3-50'
+    return false
+  }
+  studentUsernameError.value = ''
+  return true
+}
+const isStudentLoginValid = computed(() => {
+  if (loginMode.value === 'phone') {
+    return /^1[3-9]\d{9}$/.test(studentPhone.value.trim())
+  } else {
+    const u = studentUsername.value.trim()
+    return u.length >= 3 && u.length <= 50
+  }
+})
+
 const submitStudentLogin = async () => {
   if (studentLoginLoading.value) return
-  const ok = validateStudentPhone()
+  
+  let ok = false
+  if (loginMode.value === 'phone') {
+    ok = validateStudentPhone()
+  } else {
+    ok = validateStudentUsername()
+  }
+  
   if (!ok) return
   if (!isHttps.value) {
     notify('请在 HTTPS 环境下提交')
@@ -61,7 +104,10 @@ const submitStudentLogin = async () => {
     const data = await apiJson('commons/login_alt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: null, phone: studentPhone.value.trim() }),
+      body: JSON.stringify({ 
+        username: loginMode.value === 'username' ? studentUsername.value.trim() : null, 
+        phone: loginMode.value === 'phone' ? studentPhone.value.trim() : null 
+      }),
     })
     const token = (data as any)?.token || (data as any)?.data?.token
     if (token) {
@@ -80,11 +126,13 @@ const submitStudentLogin = async () => {
 }
 
 const regUsername = ref('')
+const regName = ref('')
 const regRole = ref('student')
 const regGender = ref<'男' | '女'>('男')
 const regPhone = ref('')
 const regPassword = ref('admin123')
 const regUsernameError = ref('')
+const regNameError = ref('')
 const regRoleError = ref('')
 const regGenderError = ref('')
 const regPhoneError = ref('')
@@ -94,6 +142,13 @@ const validateRegUsername = () => {
   if (!u) { regUsernameError.value = '请输入用户名'; return false }
   if (u.length < 3 || u.length > 50) { regUsernameError.value = '用户名长度为3-50'; return false }
   regUsernameError.value = ''
+  return true
+}
+const validateRegName = () => {
+  const n = regName.value.trim()
+  if (!n) { regNameError.value = '请输入姓名'; return false }
+  if (n.length < 2 || n.length > 20) { regNameError.value = '姓名长度为2-20'; return false }
+  regNameError.value = ''
   return true
 }
 const validateRegRole = () => {
@@ -117,8 +172,14 @@ const validateRegPhone = () => {
 }
 const isRegisterValid = computed(() => {
   const u = regUsername.value.trim()
+  const n = regName.value.trim()
   const p = regPhone.value.trim()
-  return u.length >= 3 && u.length <= 50 && /^1[3-9]\d{9}$/.test(p) && !!regRole.value && !!regGender.value
+  return (
+    u.length >= 3 && u.length <= 50 &&
+    n.length >= 2 && n.length <= 20 &&
+    /^1[3-9]\d{9}$/.test(p) &&
+    !!regRole.value && !!regGender.value
+  )
 })
 
 const roleDialogVisible = ref(false)
@@ -133,10 +194,11 @@ const selectRole = (val: 'student' | 'teacher') => {
 const submitStudentRegister = async () => {
   if (studentRegisterLoading.value) return
   const a = validateRegUsername()
+  const a2 = validateRegName()
   const b = validateRegRole()
   const c = validateRegGender()
   const d = validateRegPhone()
-  if (!(a && b && c && d)) return
+  if (!(a && a2 && b && c && d)) return
   if (!isHttps.value) {
     notify('请在 HTTPS 环境下提交')
     return
@@ -145,6 +207,7 @@ const submitStudentRegister = async () => {
   try {
     const body = JSON.stringify({
       username: regUsername.value.trim(),
+      name: regName.value.trim(),
       password: regPassword.value,
       role: regRole.value,
       gender: regGender.value,
@@ -393,7 +456,26 @@ const socialLogin = (provider: string) => {
           </div>
 
           <div v-if="studentTab === 'login'">
-            <div class="form-group" :class="{ 'has-error': studentPhoneError }">
+            <div class="login-mode-switch">
+              <button 
+                type="button" 
+                class="mode-button" 
+                :class="{ active: loginMode === 'phone' }"
+                @click="loginMode = 'phone'"
+              >
+                手机号登录
+              </button>
+              <button 
+                type="button" 
+                class="mode-button" 
+                :class="{ active: loginMode === 'username' }"
+                @click="loginMode = 'username'"
+              >
+                用户名登录
+              </button>
+            </div>
+
+            <div v-if="loginMode === 'phone'" class="form-group" :class="{ 'has-error': studentPhoneError }">
               <label for="student-phone" class="form-label">
                 <el-icon><User /></el-icon>
                 手机号
@@ -421,6 +503,33 @@ const socialLogin = (provider: string) => {
               </div>
             </div>
 
+            <div v-else class="form-group" :class="{ 'has-error': studentUsernameError }">
+              <label for="student-username" class="form-label">
+                <el-icon><User /></el-icon>
+                用户名
+              </label>
+              <div class="input-wrapper">
+                <input
+                  id="student-username"
+                  v-model="studentUsername"
+                  type="text"
+                  class="form-input"
+                  placeholder="请输入用户名"
+                  :class="{ 'input-error': studentUsernameError }"
+                  @blur="validateStudentUsername"
+                  @keyup.enter="isStudentLoginValid && submitStudentLogin()"
+                  autocomplete="username"
+                />
+                <div v-if="studentUsername && !studentUsernameError" class="input-icon success">
+                  <el-icon><CircleCheck /></el-icon>
+                </div>
+              </div>
+              <div v-if="studentUsernameError" class="error-message">
+                <el-icon><Warning /></el-icon>
+                {{ studentUsernameError }}
+              </div>
+            </div>
+
             <button
               type="button"
               class="submit-button"
@@ -437,108 +546,133 @@ const socialLogin = (provider: string) => {
           </div>
 
           <div v-else>
-            <div class="form-group" :class="{ 'has-error': regUsernameError }">
-              <label for="reg-username" class="form-label">
-                <el-icon><User /></el-icon>
-                用户名
-              </label>
-              <div class="input-wrapper">
-                <input
-                  id="reg-username"
-                  v-model="regUsername"
-                  type="text"
-                  class="form-input"
-                  placeholder="请输入用户名（3-50）"
-                  :class="{ 'input-error': regUsernameError }"
-                  @blur="validateRegUsername"
-                  autocomplete="username"
-                />
-              </div>
-              <div v-if="regUsernameError" class="error-message">
-                <el-icon><Warning /></el-icon>
-                {{ regUsernameError }}
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="reg-password" class="form-label">
-                <el-icon><Lock /></el-icon>
-                密码（固定）
-              </label>
-              <div class="input-wrapper">
-                <input id="reg-password" v-model="regPassword" type="password" class="form-input" disabled />
-              </div>
-            </div>
-
-            <div class="form-group" :class="{ 'has-error': regRoleError }">
-              <label class="form-label">角色</label>
-              <div class="input-wrapper">
-                <button type="button" class="form-input role-display" @click="openRoleDialog" aria-haspopup="dialog" :aria-label="'当前角色：' + (regRole === 'student' ? '学生' : '老师')">
-                  <span class="role-text">{{ regRole === 'student' ? '学生' : '老师' }}</span>
-                  <span class="role-arrow" aria-hidden="true"></span>
-                </button>
-              </div>
-              <div v-if="regRoleError" class="error-message">
-                <el-icon><Warning /></el-icon>
-                {{ regRoleError }}
+            <div class="register-grid">
+              <div class="form-group" :class="{ 'has-error': regUsernameError }">
+                <label for="reg-username" class="form-label">
+                  <el-icon><User /></el-icon>
+                  用户名
+                </label>
+                <div class="input-wrapper">
+                  <input
+                    id="reg-username"
+                    v-model="regUsername"
+                    type="text"
+                    class="form-input"
+                    placeholder="请输入用户名（3-50）"
+                    :class="{ 'input-error': regUsernameError }"
+                    @blur="validateRegUsername"
+                    autocomplete="username"
+                  />
+                </div>
+                <div v-if="regUsernameError" class="error-message">
+                  <el-icon><Warning /></el-icon>
+                  {{ regUsernameError }}
+                </div>
               </div>
 
-              <el-dialog v-model="roleDialogVisible" title="选择角色" width="360px" :close-on-click-modal="true" :close-on-press-escape="true">
-                <div class="role-grid">
-                  <button type="button" class="role-card" :class="{ active: regRole === 'student' }" @click="selectRole('student')">
-                    <span class="role-card-title">学生</span>
-                    <span class="role-card-desc">用于学员登录与学习记录</span>
-                  </button>
-                  <button type="button" class="role-card" :class="{ active: regRole === 'teacher' }" @click="selectRole('teacher')">
-                    <span class="role-card-title">老师</span>
-                    <span class="role-card-desc">用于教师登录与教学管理</span>
+              <div class="form-group" :class="{ 'has-error': regNameError }">
+                <label for="reg-name" class="form-label">
+                  <el-icon><User /></el-icon>
+                  姓名
+                </label>
+                <div class="input-wrapper">
+                  <input
+                    id="reg-name"
+                    v-model="regName"
+                    type="text"
+                    class="form-input"
+                    placeholder="请输入姓名（2-20）"
+                    :class="{ 'input-error': regNameError }"
+                    @blur="validateRegName"
+                    autocomplete="name"
+                  />
+                </div>
+                <div v-if="regNameError" class="error-message">
+                  <el-icon><Warning /></el-icon>
+                  {{ regNameError }}
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="reg-password" class="form-label">
+                  <el-icon><Lock /></el-icon>
+                  密码（固定）
+                </label>
+                <div class="input-wrapper">
+                  <input id="reg-password" v-model="regPassword" type="password" class="form-input" disabled />
+                </div>
+              </div>
+
+              <div class="form-group" :class="{ 'has-error': regRoleError }">
+                <label class="form-label">角色</label>
+                <div class="input-wrapper">
+                  <button type="button" class="form-input role-display" @click="openRoleDialog" aria-haspopup="dialog" :aria-label="'当前角色：' + (regRole === 'student' ? '学生' : '老师')">
+                    <span class="role-text">{{ regRole === 'student' ? '学生' : '老师' }}</span>
+                    <span class="role-arrow" aria-hidden="true"></span>
                   </button>
                 </div>
-                <template #footer>
-                  <el-button @click="roleDialogVisible = false">取消</el-button>
-                </template>
-              </el-dialog>
-            </div>
+                <div v-if="regRoleError" class="error-message">
+                  <el-icon><Warning /></el-icon>
+                  {{ regRoleError }}
+                </div>
 
-            <div class="form-group" :class="{ 'has-error': regGenderError }">
-              <label class="form-label">性别</label>
-              <div class="gender-row">
-                <label class="radio">
-                  <input type="radio" value="男" v-model="regGender" @change="validateRegGender" />
-                  男
-                </label>
-                <label class="radio">
-                  <input type="radio" value="女" v-model="regGender" @change="validateRegGender" />
-                  女
-                </label>
+                <el-dialog v-model="roleDialogVisible" title="选择角色" width="360px" :close-on-click-modal="true" :close-on-press-escape="true">
+                  <div class="role-grid">
+                    <button type="button" class="role-card" :class="{ active: regRole === 'student' }" @click="selectRole('student')">
+                      <span class="role-card-title">学生</span>
+                      <span class="role-card-desc">用于学员登录与学习记录</span>
+                    </button>
+                    <button type="button" class="role-card" :class="{ active: regRole === 'teacher' }" @click="selectRole('teacher')">
+                      <span class="role-card-title">老师</span>
+                      <span class="role-card-desc">用于教师登录与教学管理</span>
+                    </button>
+                  </div>
+                  <template #footer>
+                    <el-button @click="roleDialogVisible = false">取消</el-button>
+                  </template>
+                </el-dialog>
               </div>
-              <div v-if="regGenderError" class="error-message">
-                <el-icon><Warning /></el-icon>
-                {{ regGenderError }}
-              </div>
-            </div>
 
-            <div class="form-group" :class="{ 'has-error': regPhoneError }">
-              <label for="reg-phone" class="form-label">
-                <el-icon><User /></el-icon>
-                手机号
-              </label>
-              <div class="input-wrapper">
-                <input
-                  id="reg-phone"
-                  v-model="regPhone"
-                  type="tel"
-                  inputmode="numeric"
-                  class="form-input"
-                  placeholder="请输入手机号"
-                  :class="{ 'input-error': regPhoneError }"
-                  @blur="validateRegPhone"
-                  autocomplete="tel"
-                />
+              <div class="form-group" :class="{ 'has-error': regGenderError }">
+                <label class="form-label">性别</label>
+                <div class="gender-row">
+                  <label class="radio">
+                    <input type="radio" value="男" v-model="regGender" @change="validateRegGender" />
+                    男
+                  </label>
+                  <label class="radio">
+                    <input type="radio" value="女" v-model="regGender" @change="validateRegGender" />
+                    女
+                  </label>
+                </div>
+                <div v-if="regGenderError" class="error-message">
+                  <el-icon><Warning /></el-icon>
+                  {{ regGenderError }}
+                </div>
               </div>
-              <div v-if="regPhoneError" class="error-message">
-                <el-icon><Warning /></el-icon>
-                {{ regPhoneError }}
+
+              <div class="form-group" :class="{ 'has-error': regPhoneError }">
+                <label for="reg-phone" class="form-label">
+                  <el-icon><User /></el-icon>
+                  手机号
+                </label>
+                <div class="input-wrapper">
+                  <input
+                    id="reg-phone"
+                    v-model="regPhone"
+                    type="tel"
+                    inputmode="numeric"
+                    class="form-input"
+                    placeholder="请输入手机号"
+                    :class="{ 'input-error': regPhoneError }"
+                    @blur="validateRegPhone"
+                    autocomplete="tel"
+                  />
+                </div>
+                <div v-if="regPhoneError" class="error-message">
+                  <el-icon><Warning /></el-icon>
+                  {{ regPhoneError }}
+                </div>
               </div>
             </div>
 
@@ -1156,8 +1290,62 @@ const socialLogin = (provider: string) => {
   line-height: 1.5;
 }
 
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.register-grid .form-group {
+  margin-bottom: 0;
+}
+
+.register-grid .form-group:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.login-mode-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.mode-button {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-button:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.mode-button.active {
+  background: #667eea;
+  border-color: #667eea;
+  color: #ffffff;
+}
+
 /* 响应式设计 */
 @media (max-width: 480px) {
+  .register-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .register-grid .form-group:last-child:nth-child(odd) {
+    grid-column: 1;
+  }
+
   .login-card {
     padding: 32px 24px;
     margin: 0 16px;

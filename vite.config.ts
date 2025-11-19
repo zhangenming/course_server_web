@@ -15,7 +15,10 @@ export default defineConfig({
   },
   // 新增：开发环境代理配置
   server: {
-    https: true,
+    https: {
+      cert: undefined,
+      key: undefined
+    },
     host: 'localhost',
     proxy: {
       '/api/v1/quizzes': {
