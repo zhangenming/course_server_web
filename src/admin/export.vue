@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { apiJson, apiFetch } from '@/utils/request'
-import { SwitchButton } from '@element-plus/icons-vue'
+import { SwitchButton, Download } from '@element-plus/icons-vue'
 
 const type = ref<'learning' | 'surveys'>('learning')
 const format = ref<'json' | 'csv'>('json')
@@ -52,6 +52,30 @@ const downloadJson = () => {
   a.remove()
   URL.revokeObjectURL(url)
 }
+const exportAll = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    const res = await apiFetch('api/v1/export/xlsx', { page_size: 2000 })
+    if (!res.ok) throw new Error(`请求失败(${res.status})`)
+    const blob = await res.blob()
+    const cd = res.headers.get('Content-Disposition') || ''
+    const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i)
+    const filename = decodeURIComponent(m?.[1] || m?.[2] || 'all_records.xlsx')
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    error.value = e?.message || '网络错误'
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -70,6 +94,10 @@ const downloadJson = () => {
         <el-button type="primary" :disabled="loading" @click="run">
           <el-icon><SwitchButton /></el-icon>
           导出
+        </el-button>
+        <el-button type="success" :disabled="loading" @click="exportAll">
+          <el-icon><Download /></el-icon>
+          导出全部
         </el-button>
         <el-button :disabled="format !== 'json' || preview == null" @click="downloadJson">下载JSON</el-button>
       </div>
