@@ -17,13 +17,13 @@ const password = ref('')
 const showPassword = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const bannerType = ref<'success' | 'error'>('error')
 const rememberMe = ref(false)
 const usernameError = ref('')
 const passwordError = ref('')
 
 const activeAuth = ref<'admin' | 'student'>('admin')
 const studentTab = ref<'login' | 'register'>('login')
-const isHttps = computed(() => typeof location !== 'undefined' && location.protocol === 'https:')
 const maskPhone = (s: string) => {
   const v = String(s || '')
   if (v.length < 7) return v
@@ -95,10 +95,6 @@ const submitStudentLogin = async () => {
   }
   
   if (!ok) return
-  if (!isHttps.value) {
-    notify('请在 HTTPS 环境下提交')
-    return
-  }
   studentLoginLoading.value = true
   try {
     const data = await apiJson('commons/login_alt', {
@@ -199,10 +195,6 @@ const submitStudentRegister = async () => {
   const c = validateRegGender()
   const d = validateRegPhone()
   if (!(a && a2 && b && c && d)) return
-  if (!isHttps.value) {
-    notify('请在 HTTPS 环境下提交')
-    return
-  }
   studentRegisterLoading.value = true
   try {
     const body = JSON.stringify({
@@ -214,7 +206,7 @@ const submitStudentRegister = async () => {
       phone: regPhone.value.trim(),
     })
     const data = await apiJson('api/v1/users/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
-    notify('注册成功：' + maskPhone(regPhone.value.trim()))
+    notify('注册成功：' + maskPhone(regPhone.value.trim()), 'success')
     studentTab.value = 'login'
     studentPhone.value = regPhone.value.trim()
   } catch (e: any) {
@@ -226,7 +218,8 @@ const submitStudentRegister = async () => {
 
 let hideTimer: number | undefined
 
-const notify = (msg: string) => {
+const notify = (msg: string, type: 'success' | 'error' = 'error') => {
+  bannerType.value = type
   error.value = msg
   if (hideTimer) clearTimeout(hideTimer)
   hideTimer = window.setTimeout(() => {
@@ -339,7 +332,7 @@ const socialLogin = (provider: string) => {
 <template>
   <div class="login-page">
     <div class="login-container">
-      <div v-if="error" class="banner" role="alert" @click="error = null">
+      <div v-if="error" class="banner" :class="bannerType" role="alert" @click="error = null">
         <el-icon><Warning /></el-icon>
         {{ error }}
       </div>
@@ -828,7 +821,6 @@ const socialLogin = (provider: string) => {
   top: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(239, 68, 68, 0.95);
   color: #fff;
   padding: 12px 20px;
   border-radius: 12px;
@@ -841,6 +833,8 @@ const socialLogin = (provider: string) => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   animation: slideDown 0.3s ease-out;
 }
+.banner.error { background: rgba(239, 68, 68, 0.95); }
+.banner.success { background: rgba(5, 150, 105, 0.95); }
 
 @keyframes slideDown {
   from {

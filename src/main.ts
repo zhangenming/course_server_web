@@ -22,15 +22,12 @@ declare global {
   if (localStorage.token) {
     ;(window as any).token = localStorage.token
     const params = new URLSearchParams(location.search)
-    const wantsAdmin =
-      params.has('admin') || location.pathname.startsWith('/admin')
+    const wantsAdmin = params.has('admin') || location.pathname.startsWith('/admin')
     let me: any = null
     try {
       me = (await apiJson('api/v1/users/me')) as any
     } catch {}
-    const isAdminUser = !!(
-      me && String(me.role || '').toLowerCase() === 'admin'
-    )
+    const isAdminUser = !!(me && String(me.role || '').toLowerCase() === 'admin')
     if (isAdminUser && me && typeof me.user_id === 'number') {
       window.id = me.user_id
     }
