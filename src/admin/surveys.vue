@@ -1,11 +1,106 @@
 <script setup lang="ts">
-import { ref, nextTick, computed } from 'vue'
+import { ref, nextTick, computed, onMounted } from 'vue'
 import { apiJson } from '@/utils/request'
 
 type Option = { text: string; value: number | null }
 type Question = { text: string; options: Option[] }
 type Range = { min: number; label: string; command?: string }
 
+// 问卷列表数据
+const surveys = ref<any[]>([])
+const loading = ref(false)
+
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(8)
+const totalCount = ref(0)
+
+// 获取问卷列表
+const fetchSurveys = async () => {
+  loading.value = true
+  try {
+    const response = await apiJson('api/v1/surveys', {
+      method: 'GET',
+      params: {
+        page: currentPage.value,
+        limit: pageSize.value
+      }
+    })
+    surveys.value = response.data || []
+    totalCount.value = response.total || 0
+  } catch (error) {
+    console.error('获取问卷列表失败:', error)
+    surveys.value = []
+    totalCount.value = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+// 分页函数
+const changePage = (page: number) => {
+  currentPage.value = page
+  fetchSurveys()
+}
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    fetchSurveys()
+  }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    fetchSurveys()
+  }
+}
+
+// 计算总页数
+const totalPages = computed(() => Math.ceil(totalCount.value / pageSize.value))
+
+// 计算可见页码
+const visiblePages = computed(() => {
+  const pages = []
+  const start = Math.max(1, currentPage.value - 2)
+  const end = Math.min(totalPages.value, currentPage.value + 2)
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+// 删除问卷
+const deleteSurvey = async (id: string) => {
+  if (!confirm('确定要删除这个问卷吗？')) return
+  
+  try {
+    await apiJson(`api/v1/surveys/${id}`, {
+      method: 'DELETE'
+    })
+    createMessage.value = '删除成功'
+    fetchSurveys()
+  } catch (error) {
+    createMessage.value = '删除失败'
+    console.error('删除问卷失败:', error)
+  }
+  setTimeout(() => (createMessage.value = ''), 2000)
+}
+
+// 切换创建模式
+const showCreateForm = ref(false)
+
+// 返回列表
+const backToList = () => {
+  showCreateForm.value = false
+  fetchSurveys()
+}
+
+onMounted(() => {
+  fetchSurveys()
+})
 // 改为题目列表：默认三个空白题目，每题三个空白选项
 const questions = ref<Question[]>([
   {
@@ -77,6 +172,9 @@ const createSurvey = async () => {
     })
     createMessage.value = '创建成功'
     emit('created')
+    // 创建成功后返回列表
+    showCreateForm.value = false
+    fetchSurveys()
   } catch (e: any) {
     createMessage.value = e?.message || '网络错误'
   }
@@ -148,6 +246,38 @@ const hasDuplicateMins = computed(() => {
   return false
 })
 
+// 计算问卷满分
+const maxScoreForSurvey = (survey: any) => {
+  if (!survey.questions || !Array.isArray(survey.questions)) return 0
+  return survey.questions.reduce((sum: number, q: any) => {
+    if (!q.options || !Array.isArray(q.options)) return sum
+    const maxOpt = q.options.reduce((m: number, o: any) => {
+      const v = Number.isFinite(o.value) ? (o.value || 0) : 0
+      return Math.max(m, v)
+    }, 0)
+    return sum + maxOpt
+  }, 0)
+}
+
+// 格式化日期
+const formatDate = (dateString: string) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+// 编辑问卷（预留功能）
+const editSurvey = (survey: any) => {
+  // TODO: 实现编辑功能
+  console.log('编辑问卷:', survey)
+}
+
+// 预览问卷（预留功能）
+const previewSurvey = (survey: any) => {
+  // TODO: 实现预览功能
+  console.log('预览问卷:', survey)
+}
+
 // 统计信息：题目总数与当前满分（每题最高选项分数求和）
 const totalQuestions = computed(() => questions.value.length)
 const maxScore = computed(() =>
@@ -165,172 +295,286 @@ const maxScore = computed(() =>
 </script>
 
 <template>
-  <div class="survey">
-    <div class="survey-header">
-      <div class="field">
-        <span class="field-label">问卷标题</span>
-        <input
-          class="input theme-input"
-          type="text"
-          v-model="theme"
-          placeholder="请输入问卷标题"
-        />
+  <div class="survey-container">
+    <!-- 问卷列表视图 -->
+    <div v-if="!showCreateForm" class="survey-list">
+      <div class="page-header">
+        <h2 class="page-title">问卷管理</h2>
+        <button class="btn btn-primary" @click="showCreateForm = true">
+          创建问卷
+        </button>
       </div>
-    </div>
-    <div class="content-grid">
-      <!-- 左侧：将所有题目合并在一个卡片中，内部做分隔 -->
-      <div class="left-col">
-        <div class="options-card questions-card">
-          <div class="options-toolbar">
-            <div class="options-title">题目</div>
-            <div class="toolbar-right">
-              <button class="btn btn-primary" @click="addQuestion">
-                添加题目
-              </button>
+
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <span>加载中...</span>
+      </div>
+
+      <!-- 问卷列表 -->
+      <div v-else-if="surveys.length > 0" class="survey-grid">
+        <div v-for="survey in surveys" :key="survey.id" class="survey-card">
+          <div class="survey-card-header">
+            <h3 class="survey-title">{{ survey.theme || '未命名问卷' }}</h3>
+            <div class="survey-stats">
+              <span class="stat-item">
+                <i class="icon-questions"></i>
+                {{ survey.questions?.length || 0 }} 题
+              </span>
+              <span class="stat-item">
+                <i class="icon-score"></i>
+                满分 {{ maxScoreForSurvey(survey) }} 分
+              </span>
             </div>
           </div>
-          <div class="questions-list">
-            <div
-              class="question-block"
-              v-for="(q, qi) in questions"
-              :key="'q-block-' + qi"
-            >
-              <!-- 题目输入（右侧两按钮与下方两列对齐，放同一行） -->
-              <div class="field with-action">
-                <span class="field-label"
-                  ><span class="question-index">题目 {{ qi + 1 }}</span></span
-                >
-                <input
-                  class="input"
-                  type="text"
-                  v-model="q.text"
-                  placeholder="请输入题干"
-                  :ref="el => (questionInputs[qi] = el as HTMLInputElement)"
-                />
-                <button class="btn btn-primary" @click="addOption(qi)">
-                  添加选项
-                </button>
-                <button
-                  class="btn btn-ghost"
-                  @click="removeQuestion(qi)"
-                  :disabled="questions.length <= 1"
-                >
-                  删除题目
-                </button>
-              </div>
-
-              <div class="options-list">
-                <div class="option-row" v-for="(o, i) in q.options" :key="i">
-                  <span class="option-label">{{
-                    String.fromCharCode(65 + i)
-                  }}</span>
-                  <input
-                    class="input"
-                    type="text"
-                    v-model="o.text"
-                    placeholder="选项内容"
-                    :ref="el => {
-                      (optionInputs[qi] ||= [])
-                      optionInputs[qi][i] = el as HTMLInputElement
-                    }"
-                  />
-                  <input
-                    class="input score"
-                    type="number"
-                    v-model.number="o.value"
-                    min="0"
-                    step="1"
-                    inputmode="numeric"
-                    placeholder="分值"
-                    :class="{ invalid: shouldValidate && (o.value === null || Number.isNaN(o.value as number) || (o.value as number) < 0) }"
-                  />
-                  <button
-                    class="btn btn-ghost"
-                    @click="q.options.splice(i, 1)"
-                    :disabled="q.options.length <= 1"
-                  >
-                    删除选项
-                  </button>
-                </div>
-              </div>
-              <!-- 未填写分值提示：本题存在未填写的分值时显示 -->
-              <div
-                class="hint-row"
-                v-if="shouldValidate && q.options.some(o => o.value === null || Number.isNaN(o.value as number))"
-              >
-                提示：本题存在未填写的分值，请补充。
-              </div>
+          <div class="survey-card-body">
+            <div class="survey-meta">
+              <span class="meta-item">创建时间: {{ formatDate(survey.createdAt) }}</span>
+              <span class="meta-item">状态: {{ survey.status || '草稿' }}</span>
             </div>
+          </div>
+          <div class="survey-card-actions">
+            <button class="btn btn-secondary" @click="editSurvey(survey)">
+              编辑
+            </button>
+            <button class="btn btn-secondary" @click="previewSurvey(survey)">
+              预览
+            </button>
+            <button class="btn btn-ghost" @click="deleteSurvey(survey.id)">
+              删除
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- 右侧：评分规则 -->
-      <div class="right-col">
-        <!-- 评分规则设置 -->
-        <div class="options-card scoring-card">
-          <div class="options-toolbar">
-            <div class="options-title">评分规则</div>
-            <div class="toolbar-right">
-              <span class="toolbar-info">题目总数：{{ totalQuestions }}</span>
-              <span class="toolbar-info">当前满分：{{ maxScore }}</span>
-              <button class="btn btn-primary" @click="addRange">添加</button>
-            </div>
-          </div>
+      <!-- 空状态 -->
+      <div v-else class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>暂无问卷</h3>
+        <p>点击上方按钮创建您的第一个问卷</p>
+      </div>
 
-          <div class="rules-header">
-            <span class="col-label">序号</span>
-            <span class="col-label">阈值分数</span>
-            <span class="col-label">评价</span>
-            <span class="col-label">命令</span>
-            <span class="col-label">操作</span>
-          </div>
-
-          <div class="options-list">
-            <div class="rules-row" v-for="(r, i) in ranges" :key="i">
-              <span class="option-label">{{ i + 1 }}</span>
-              <input
-                class="input score"
-                type="number"
-                v-model.number="r.min"
-                min="0"
-                step="1"
-                inputmode="numeric"
-                :class="{ invalid: r.min < 0 }"
-              />
-              <input
-                class="input"
-                type="text"
-                v-model="r.label"
-                placeholder="评价标签，如：优秀"
-              />
-              <input
-                class="input"
-                type="text"
-                v-model="r.command"
-                placeholder="命令"
-              />
-              <button
-                class="btn btn-ghost"
-                @click="removeRange(i)"
-                :disabled="ranges.length <= 1"
-              >
-                删除
-              </button>
-            </div>
-          </div>
-
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-            "
+      <!-- 分页 -->
+      <div v-if="totalCount > pageSize" class="pagination">
+        <button 
+          class="btn btn-secondary" 
+          @click="prevPage" 
+          :disabled="currentPage === 1"
+        >
+          上一页
+        </button>
+        
+        <div class="page-numbers">
+          <button
+            v-for="page in visiblePages"
+            :key="page"
+            class="btn"
+            :class="{ 'btn-primary': page === currentPage, 'btn-secondary': page !== currentPage }"
+            @click="changePage(page)"
           >
-            <div style="color: #ef4444" v-if="hasDuplicateMins">
-              提示：存在重复的阈值，请调整。
+            {{ page }}
+          </button>
+        </div>
+        
+        <button 
+          class="btn btn-secondary" 
+          @click="nextPage" 
+          :disabled="currentPage === totalPages"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+
+    <!-- 问卷创建/编辑视图 -->
+    <div v-else class="survey">
+      <div class="survey-header">
+        <div>
+          <div class="title">创建问卷</div>
+          <div class="desc">设计您的问卷题目与评分规则</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" @click="backToList">返回列表</button>
+        </div>
+      </div>
+
+      <!-- 问卷主题输入 -->
+      <div class="field">
+        <label class="field-label">问卷主题</label>
+        <input
+          v-model="theme"
+          class="input theme-input"
+          placeholder="请输入问卷主题"
+        />
+      </div>
+
+      <!-- 内容网格：题目与评分规则 -->
+      <div class="content-grid">
+        <!-- 左侧：题目列表 -->
+        <div class="left-col">
+          <div class="options-card questions-card">
+            <div class="options-toolbar">
+              <span class="options-title">题目设置</span>
+              <button class="btn btn-primary" @click="addQuestion">添加题目</button>
+            </div>
+
+            <div class="questions-list">
+              <div
+                v-for="(question, qi) in questions"
+                :key="qi"
+                class="question-block"
+              >
+                <!-- 题目输入 -->
+                <div class="field with-action questions-top">
+                  <span class="question-index">题目 {{ qi + 1 }}</span>
+                  <input
+                    :ref="(el) => (questionInputs[qi] = el as HTMLInputElement)"
+                    v-model="question.text"
+                    class="input"
+                    placeholder="请输入题目内容"
+                    :class="{ invalid: shouldValidate && !question.text.trim() }"
+                  />
+                  <button
+                    v-if="questions.length > 1"
+                    class="btn btn-ghost"
+                    @click="removeQuestion(qi)"
+                  >
+                    删除
+                  </button>
+                  <div v-else></div>
+                </div>
+
+                <!-- 选项列表 -->
+                <div class="options-list">
+                  <div class="options-header">
+                    <span class="col-label">序号</span>
+                    <span class="col-label">选项内容</span>
+                    <span class="col-label">分数</span>
+                    <span class="col-label">操作</span>
+                  </div>
+
+                  <div
+                    v-for="(option, oi) in question.options"
+                    :key="oi"
+                    class="option-row"
+                  >
+                    <label class="option-label">{{ oi + 1 }}</label>
+                    <input
+                      v-model="option.text"
+                      class="input"
+                      placeholder="选项内容"
+                      :class="{ invalid: shouldValidate && !option.text.trim() }"
+                    />
+                    <input
+                      v-model.number="option.value"
+                      type="number"
+                      class="input score"
+                      placeholder="分数"
+                      :class="{ invalid: shouldValidate && !Number.isFinite(option.value) }"
+                    />
+                    <button
+                      v-if="question.options.length > 1"
+                      class="btn btn-ghost"
+                      @click="question.options.splice(oi, 1)"
+                    >
+                      删除
+                    </button>
+                    <div v-else></div>
+                  </div>
+
+                  <div class="hint-row" v-if="shouldValidate && question.options.some(o => !o.text.trim() || !Number.isFinite(o.value))">
+                    请完善所有选项内容与对应分数
+                  </div>
+                </div>
+
+                <!-- 添加选项按钮 -->
+                <div style="margin-top: 12px">
+                  <button class="btn btn-secondary" @click="addOption(qi)">
+                    添加选项
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
+
+        <!-- 右侧：评分规则 -->
+        <div class="right-col">
+          <div class="options-card scoring-card">
+            <div class="options-toolbar">
+              <span class="options-title">评分规则</span>
+              <div class="toolbar-right">
+                <span class="toolbar-info">共 {{ ranges.length }} 条规则</span>
+                <button class="btn btn-primary" @click="addRange">添加规则</button>
+              </div>
+            </div>
+
+            <div class="options-list">
+              <div class="rules-header">
+                <span class="col-label">序号</span>
+                <span class="col-label">最低分</span>
+                <span class="col-label">等级标签</span>
+                <span class="col-label">建议指令</span>
+                <span class="col-label">操作</span>
+              </div>
+
+              <div
+                v-for="(range, ri) in ranges"
+                :key="ri"
+                class="rules-row"
+                :class="{ invalid: shouldValidate && hasDuplicateMins }"
+              >
+                <label class="option-label">{{ ri + 1 }}</label>
+                <input
+                  v-model.number="range.min"
+                  type="number"
+                  class="input score"
+                  placeholder="最低分"
+                  :class="{ invalid: shouldValidate && (!Number.isFinite(range.min) || hasDuplicateMins) }"
+                />
+                <input
+                  v-model="range.label"
+                  class="input"
+                  placeholder="等级标签"
+                  :class="{ invalid: shouldValidate && !range.label.trim() }"
+                />
+                <input
+                  v-model="range.command"
+                  class="input"
+                  placeholder="建议指令"
+                />
+                <button
+                  v-if="ranges.length > 1"
+                  class="btn btn-ghost"
+                  @click="removeRange(ri)"
+                >
+                  删除
+                </button>
+                <div v-else></div>
+              </div>
+
+              <div class="hint-row" v-if="shouldValidate && hasDuplicateMins">
+                评分规则存在重复的最低分，请检查
+              </div>
+            </div>
+          </div>
+
+          <!-- 统计信息 -->
+          <div class="rules-meta">
+            <span>题目总数: {{ totalQuestions }}</span>
+            <span>问卷满分: {{ maxScore }} 分</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部操作栏 -->
+      <div class="survey-footer">
+        <div class="footer-info">
+          <span v-if="createMessage" class="create-msg">{{ createMessage }}</span>
+        </div>
+        <div class="footer-actions">
+          <button class="btn btn-secondary" @click="backToList">取消</button>
+          <button class="btn btn-primary" @click="createSurvey">创建问卷</button>
         </div>
       </div>
     </div>
@@ -339,20 +583,242 @@ const maxScore = computed(() =>
 
 <style scoped>
 /* 布局容器 */
+.survey-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+/* 页面头部 */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+/* 问卷列表网格 */
+.survey-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+/* 问卷卡片 */
+.survey-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.survey-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.survey-card-header {
+  margin-bottom: 16px;
+}
+
+.survey-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+.survey-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-questions::before {
+  content: "❓";
+  font-size: 12px;
+}
+
+.icon-score::before {
+  content: "💯";
+  font-size: 12px;
+}
+
+.survey-card-body {
+  flex: 1;
+  margin-bottom: 20px;
+}
+
+.survey-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+}
+
+.survey-card-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #6b7280;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px 0;
+}
+
+.empty-state p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* 分页 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .survey-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .survey-card-actions {
+    flex-direction: column;
+  }
+  
+  .pagination {
+    flex-wrap: wrap;
+  }
+}
+
+/* 头部样式调整 */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* 原有问卷创建样式 */
 .survey {
   /* 组件尽量占满屏幕宽度 */
   width: 100%;
-  max-width: 100vw;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 32px;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
-  box-shadow: none; /* 减少容器阴影，突出内容 */
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   /* 所有子元素采用边框盒模型，避免由于 padding 导致宽度溢出 */
+  box-sizing: border-box;
+}
+
+/* 原有问卷创建样式 */
+.survey {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   box-sizing: border-box;
 }
 /* 继承给子元素，保证网格内宽度计算稳定 */
@@ -425,16 +891,17 @@ const maxScore = computed(() =>
 
 /* 选项卡片与工具栏 */
 .options-card {
-  margin-top: 10px;
-  padding: 14px;
+  margin-top: 16px;
+  padding: 24px;
   border: 1px solid #e5e7eb;
-  border-left: 2px solid var(--accent-border); /* 更克制的左侧强调 */
+  border-left: 4px solid var(--accent-border); /* 更克制的左侧强调 */
   border-radius: 12px;
   background: #fff; /* 去掉卡片浅色底 */
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   /* 约束内部宽度，避免溢出 */
   overflow: hidden;
   max-width: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .options-toolbar {
   display: flex;
@@ -463,7 +930,7 @@ const maxScore = computed(() =>
   display: grid;
   /* 改为单列堆叠：上方题目与选项，下方评分规则 */
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 24px;
   align-items: start;
   max-width: 100%;
 }
@@ -477,11 +944,13 @@ const maxScore = computed(() =>
 }
 /* 题目块内部分隔：统一包裹在 questions-card 中 */
 .question-block {
-  padding: 10px 10px 12px;
-  border-left: 2px solid var(--accent-border);
-  padding-left: 14px; /* 给左侧边线留出内容间距 */
+  padding: 20px;
+  border-left: 3px solid var(--accent-border);
+  padding-left: 24px; /* 给左侧边线留出内容间距 */
   border-radius: var(--radius);
   background: #fff;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 .questions-card .question-block + .question-block {
   margin-top: 20px; /* 增大题与题之间垂直间距 */

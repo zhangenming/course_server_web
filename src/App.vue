@@ -82,10 +82,10 @@ const openVideoList = async () => {
   enterIconUI()
   try {
     const data = await apiJson('api/v1/courses/simple')
-    const arr = Array.isArray((data as any)?.data)
-      ? (data as any).data
-      : Array.isArray(data)
-      ? (data as any)
+    const arr = Array.isArray((data.items as any)?.data)
+      ? (data.items as any).data
+      : Array.isArray(data.items)
+      ? (data.items as any)
       : []
     videos.value = arr
   } catch {
@@ -188,7 +188,7 @@ const execCommand = async (cmd: {
   showCommandMenu.value = false
   exitIconUI()
   try {
-    await apiJson('commons/', { method: 'POST', body: { name: cmd.label } })
+    await apiJson('commons/', { method: 'POST', body: JSON.stringify({ name: cmd.label }) })
   } catch (e: any) {
     notifyListError(e?.message || '指令执行失败')
   }
@@ -350,7 +350,7 @@ const selectedSurveyId = ref<number | null>(null)
 const loadSurveys = async () => {
   try {
     const data = await apiJson('api/v1/surveys')
-    if (Array.isArray(data)) surveys.value = data
+    if (Array.isArray(data?.items)) surveys.value = data.items
   } catch {}
 }
 
@@ -381,7 +381,7 @@ const submitSurveyResponses = async () => {
   const answers = questions.value
     .map((q: any, i: number) => {
       const optIndex = selectedIndex.value[i]
-      const opt = (q?.options || [])[optIndex]
+      const opt = optIndex !== undefined ? (q?.options || [])[optIndex] : undefined
       return {
         question_id: Number(q?.id ?? i + 1),
         option_id: Number(opt?.id ?? optIndex),
@@ -472,7 +472,7 @@ const speakCas = (
     },
   })
 }
-let AsrTTS
+let AsrTTS: any
 onMounted(async () => {
   const token = await createAccessToken()
 
@@ -486,7 +486,7 @@ onMounted(async () => {
     // cas.stopAct()
     console.log('ASR 开始识别')
   })
-  AsrTTS.on('sentenceEnd', data => {
+  AsrTTS.on('sentenceEnd', (data: any) => {
     console.log('一句话识别结束', data)
     if (AsrTTS) {
       cas.stopAct()
@@ -601,7 +601,7 @@ const normalizeUrl = (s: any) => {
 const playFirstMusic = async () => {
   try {
     const data = await apiJson('api/v1/music/')
-    const list = data
+    const list = data?.items || []
     const it = Array.isArray(list) ? list[0] : null
     if (!it) return
     const src = normalizeUrl(it?.url)
@@ -1042,6 +1042,83 @@ const appBgUrl = appBg as any as string
   </transition>
 </template>
 
+<style>
+/* Global styles for admin interfaces */
+.admin-container {
+  background: #fafafa;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.admin-toolbar h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.admin-table {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.admin-table-head {
+  display: grid;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  font-weight: 600;
+  background: #f9fafb;
+}
+
+.admin-table-rows .row {
+  display: grid;
+  padding: 16px 20px;
+  align-items: center;
+  border-bottom: 1px solid #f8f9fa;
+  transition: background-color 0.2s ease;
+}
+
+.admin-table-rows .row:hover {
+  background-color: #f8f9fa;
+}
+
+/* Responsive design utilities */
+@media (max-width: 768px) {
+  .admin-container {
+    padding: 16px;
+  }
+  
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .admin-toolbar h2 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-toolbar h2 {
+    font-size: 20px;
+  }
+}
+</style>
+
 <style scoped>
 #container {
   width: 100%;
@@ -1051,8 +1128,8 @@ const appBgUrl = appBg as any as string
 .page {
   position: relative;
   width: 100%;
-  margin: 0 auto;
-  padding: 16px;
+  margin: 0;
+  padding: 0;
 }
 
 /* 移除 left/right 布局，数字人独立为固定定位容器 */

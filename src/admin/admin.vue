@@ -162,6 +162,10 @@ const logout = () => {
   --primary: #8b5cf6;
   --primary-hover: #7c3aed;
   --topbar-h: 50px;
+  width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 .topbar {
   position: sticky;
@@ -183,6 +187,8 @@ const logout = () => {
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
+  width: 100vw;
+  min-height: calc(100vh - var(--topbar-h));
 }
 .sidebar {
   background: #fff;
@@ -226,10 +232,11 @@ const logout = () => {
 .sidebar-menu :deep(.el-menu-item.is-active .icon svg) { stroke: #fff; }
 .sidebar-menu :deep(.el-menu-item .label) { flex: 1; font-weight: 600; }
 .content {
-  padding: 16px;
+  padding: 0;
   position: relative;
   overflow-y: auto;
   min-height: 0;
+  width: 100%;
 }
 @media (max-width: 960px) {
   .layout {

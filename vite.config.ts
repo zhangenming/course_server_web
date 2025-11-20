@@ -67,9 +67,18 @@ export default defineConfig({
       // http://localhost:5173/vite/bar
       //   -> http://jsonplaceholder.typicode.com/bar
       '/vite': {
-        target: 'http://xfjs-api.zkyr.net.cn/',
+        // target: 'http://xfjs-api.zkyr.net.cn/',
+        target:"http://127.0.0.1:8001/",
         changeOrigin: true,
         rewrite: path => path.replace(/^\/vite/, ''),
+      },
+      
+      // Proxy for @nextcas SDK requests to nexthuman.cn
+      '/webapp': {
+        target: 'https://nexthuman.cn',
+        changeOrigin: true,
+        secure: false,
+        rewrite: path => path,
       },
     },
   },

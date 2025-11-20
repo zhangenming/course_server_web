@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import SurveysAdd from './surveys.vue'
 import { apiJson } from '@/utils/request'
@@ -8,19 +8,62 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const items = ref<Array<{ id: number; theme: string }>>([])
 
+// Pagination state
+const currentPage = ref(1)
+const pageSize = ref(12) // 12 items per page for better grid layout
+const total = ref(0)
+const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
+
 const load = async () => {
   loading.value = true
   error.value = null
   items.value = []
   try {
-    const data = await apiJson('/api/v1/surveys')
-    items.value = Array.isArray(data) ? data : []
+    const offset = (currentPage.value - 1) * pageSize.value
+    const data = await apiJson(`api/v1/surveys?limit=${pageSize.value}&offset=${offset}`)
+    items.value = Array.isArray(data?.items) ? data.items : []
+    total.value = data?.total || items.value.length
   } catch (e: any) {
     error.value = e?.message || '网络错误'
   } finally {
     loading.value = false
   }
 }
+
+// Pagination controls
+const goToPage = (page: number) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+    load()
+  }
+}
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--
+    load()
+  }
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++
+    load()
+  }
+}
+
+// Compute visible page numbers for pagination
+const visiblePages = computed(() => {
+  const pages = []
+  const maxVisible = 5 // Show max 5 page numbers
+  const start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2))
+  const end = Math.min(totalPages.value, start + maxVisible - 1)
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
 
 onMounted(load)
 
@@ -110,6 +153,42 @@ const closeDetail = () => {
       </div>
       <div v-else-if="!loading && !error" class="empty">暂无问卷</div>
       <div v-if="deleteError" class="error">{{ deleteError }}</div>
+      
+      <!-- Pagination -->
+      <div v-if="totalPages > 1 && !loading" class="pagination">
+        <div class="pagination-info">
+          共 {{ total }} 条记录，第 {{ currentPage }} / {{ totalPages }} 页
+        </div>
+        <div class="pagination-controls">
+          <button 
+            class="btn btn-secondary" 
+            @click="prevPage" 
+            :disabled="currentPage === 1"
+          >
+            上一页
+          </button>
+          
+          <div class="page-numbers">
+            <button 
+              v-for="page in visiblePages" 
+              :key="page"
+              class="btn"
+              :class="{ 'btn-primary': page === currentPage, 'btn-secondary': page !== currentPage }"
+              @click="goToPage(page)"
+            >
+              {{ page }}
+            </button>
+          </div>
+          
+          <button 
+            class="btn btn-secondary" 
+            @click="nextPage" 
+            :disabled="currentPage === totalPages"
+          >
+            下一页
+          </button>
+        </div>
+      </div>
     </div>
 
     <div v-if="showAdd" class="modal-overlay">
@@ -212,16 +291,26 @@ const closeDetail = () => {
 
 <style scoped>
 .page {
-  padding: 16px;
+  padding: 24px;
+  background: #fafafa;
+  min-height: 100vh;
 }
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.toolbar h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
 }
 .list {
-  margin-top: 8px;
+  margin-top: 16px;
 }
 .status {
   color: #6b7280;
@@ -229,12 +318,14 @@ const closeDetail = () => {
 .error {
   color: #ef4444;
 }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
-.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
-.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); border-color: #d1d5db; }
-.card-body { padding: 12px; flex: 1; }
-.card-actions { padding: 12px; border-top: 1px solid #e5e7eb; display: flex; margin-top: auto; }
-.card-title { font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 24px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: flex; flex-direction: column; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); border-color: #cbd5e1; }
+.card-body { padding: 20px; flex: 1; }
+.card-actions { padding: 16px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; margin-top: auto; }
+.card-title { font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+.empty { text-align: center; padding: 40px; color: #6b7280; font-size: 14px; }
+.status { text-align: center; padding: 20px; color: #6b7280; }
 .btn {
   padding: 8px 12px;
   border: 1px solid #e5e7eb;
@@ -246,6 +337,69 @@ const closeDetail = () => {
   background: #3b82f6;
   color: #fff;
   border-color: #2563eb;
+}
+
+/* Pagination styles */
+.pagination {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 32px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.pagination-info {
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 8px;
+}
+
+.page-numbers .btn {
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.page-numbers .btn-primary {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.page-numbers .btn-secondary {
+  background: #f9fafb;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.page-numbers .btn-secondary:hover {
+  background: #f3f4f6;
+  border-color: #cbd5e1;
+}
+
+.pagination-controls .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .page {

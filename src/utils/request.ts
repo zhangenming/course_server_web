@@ -1,3 +1,54 @@
+// 定义列表数据接口
+interface ListResponse<T = any> {
+  items: T[]
+  page: number
+  pagesize: number
+  total: number
+}
+
+// 定义分页信息接口
+interface PaginationInfo {
+  page: number
+  pagesize: number
+  total: number
+}
+
+// 定义统一返回格式接口
+interface UnifiedResponse<T = any> {
+  data: T[] | T
+  pagination?: PaginationInfo
+}
+
+// 定义错误响应接口
+interface ErrorResponse {
+  message?: string
+  messgae?: string  // 兼容后端拼写错误
+  detail?: string
+}
+
+// 类型守卫函数：检查是否为列表响应
+function isListResponse(data: any): data is ListResponse {
+  return (
+    data &&
+    typeof data === 'object' &&
+    Array.isArray(data.items) &&
+    typeof data.page === 'number' &&
+    typeof data.pagesize === 'number' &&
+    typeof data.total === 'number'
+  )
+}
+
+// 类型守卫函数：检查是否为错误响应
+function isErrorResponse(data: any): data is ErrorResponse {
+  return (
+    data &&
+    typeof data === 'object' &&
+    (typeof data.message === 'string' ||
+      typeof data.messgae === 'string' ||
+      typeof data.detail === 'string')
+  )
+}
+
 export function apiFetch(input: string, init?: any) {
   const headers = new Headers(init?.headers as any)
   const token = (localStorage as any).token
@@ -97,25 +148,66 @@ declare global {
   }
 }
 
-export async function apiJson(input: string, init?: any) {
+/**
+ * 增强版apiJson函数，支持列表数据自动提取和统一格式化
+ * 
+ * 功能特点：
+ * 1. 自动识别列表数据格式（包含items、page、pagesize、total字段）
+ * 2. 提取items作为主要数据，保留分页信息
+ * 3. 对对象数据保持原有处理逻辑
+ * 4. 提供完整的类型支持
+ * 
+ * @param input - 请求URL
+ * @param init - 请求配置选项
+ * @returns 统一格式的响应数据
+ */
+export async function apiJson<T = any>(input: string, init?: any): Promise<T | UnifiedResponse<T>> {
   const res = await apiFetch(input, init)
   let data: any = null
+  
   try {
     data = await res.json()
   } catch {
     data = null
   }
+  
+  // 处理HTTP错误
   if (!res.ok) {
+    const errorData = data as ErrorResponse
     const msg =
-      (data as any)?.message ||
-      (data as any)?.messgae ||
-      (data as any)?.detail ||
+      errorData?.message ||
+      errorData?.messgae ||  // 兼容后端拼写错误
+      errorData?.detail ||
       `请求失败(${res.status})`
     throw new Error(msg)
   }
-  if (data && typeof data === 'object' && 'data' in data)
-    return (data as any).data
-  return data
+  
+  // 如果响应数据为空，直接返回
+  if (!data) {
+    return data
+  }
+  
+  // 检查是否为列表响应格式
+  if (isListResponse(data)) {
+    // 提取列表数据和分页信息
+    const { items, page, pagesize, total } = data
+    return {
+      data: items,
+      pagination: {
+        page,
+        pagesize,
+        total
+      }
+    } as UnifiedResponse<T>
+  }
+  
+  // 检查是否为标准响应格式（包含data字段）
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data
+  }
+  
+  // 对于其他对象数据，保持原有处理逻辑
+  return data as T
 }
 
 window.apiJson = apiJson
