@@ -9,6 +9,7 @@ import { replys, spks, asks } from './config'
 import { apiJson } from '@/utils/request'
 import appBg from '@/assets/bg.jpg'
 import { SwitchButton } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 
 // 移除未使用的首页显示标志
 const showSurvey = ref(false)
@@ -92,7 +93,7 @@ const setOverlay = (v: typeof overlay.value) => {
 const videos = ref<any[]>([])
 const openVideoList = async () => {
   setOverlay('videoList')
-  cas.speak(spks.chooseVideo)
+  speakCas(spks.chooseVideo)
   enterIconUI()
   try {
     const data = await apiJson('api/v1/courses/simple')
@@ -114,7 +115,14 @@ const listPlayerSrc = ref<string | null>(null)
 const showListPlayer = ref(false)
 const closeListPlayer = () => {
   setOverlay('videoList')
-  exitFullscreen()
+  if (
+    (document as any).fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement
+  ) {
+    exitFullscreen()
+  }
   if (listPlayerSrc.value && listPlayerSrc.value.startsWith('blob:')) {
     URL.revokeObjectURL(listPlayerSrc.value)
   }
@@ -191,12 +199,12 @@ const playVideoFromList = (v: any) => {
   showVideoList.value = false
   showListPlayer.value = true
   selectedCourse.value = v || null
-  cas.speak(spks.videoPlaying)
+  speakCas(spks.videoPlaying)
   enterIconUI()
 }
 const onListPlayerError = () => {
   notifyListError('视频播放失败，请稍后重试')
-  cas.speak(spks.videoError)
+  speakCas(spks.videoError)
   closeListPlayer()
 }
 
@@ -248,7 +256,7 @@ const closeSurveyPick = () => {
 const openSurveyPicker = () => {
   setOverlay('surveyTheme')
   selectedSurveyId.value = null
-  cas.speak(spks.chooseSurvey)
+  speakCas(spks.chooseSurvey)
   enterIconUI()
   loadSurveys()
 }
@@ -269,7 +277,7 @@ const loadCourses = async () => {
 loadCourses()
 // 开始答题
 const startSurvey = () => {
-  cas.speak(spks.startSurveyTip)
+  speakCas(spks.startSurveyTip)
   selectedCourse.value = null
   currentQuestionIndex.value = 0
   userAnswers.value = []
@@ -298,9 +306,11 @@ const ensureUserId = async () => {
   } catch {}
   return meUserId.value
 }
+const postedCourseIds = new Set<number>()
 const recordCourseProgress = async () => {
   const courseId = Number((selectedCourse.value as any)?.id)
   if (!courseId) return
+  if (postedCourseIds.has(courseId)) return
   const uid = await ensureUserId()
   const body = {
     user_id: uid ?? undefined,
@@ -314,6 +324,7 @@ const recordCourseProgress = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    postedCourseIds.add(courseId)
   } catch (e) {
     console.warn('记录课程进度失败', e)
   }
@@ -322,18 +333,48 @@ const recordCourseProgress = async () => {
 const onVideoEnded = () => {
   setOverlay('surveyTheme')
   recordCourseProgress().catch(() => {})
-  cas.speak(spks.chooseSurvey)
+  speakCas(spks.chooseSurvey)
   loadSurveys()
 }
-const closeVideo = () => {
+const closeVideo = async () => {
+  console.log('closeVideo start')
+  try {
+    const v = courseModalEl.value?.querySelector('video') as HTMLVideoElement | null
+    if (v) {
+      v.pause()
+      v.src = ''
+      v.load()
+    }
+  } catch {}
+  try {
+    cas.stopAct()
+  } catch {}
+  try {
+    await recordCourseProgress()
+  } catch {}
   setOverlay('surveyTheme')
-  cas.speak(spks.chooseSurvey)
+  speakStream('请选择一个测验进行测试')
   loadSurveys()
-  exitFullscreen()
+  if (
+    (document as any).fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement
+  ) {
+    exitFullscreen()
+  }
   if (courseBlobSrc.value && courseBlobSrc.value.startsWith('blob:')) {
     URL.revokeObjectURL(courseBlobSrc.value)
     courseBlobSrc.value = null
   }
+}
+const onCloseCourseClick = async (ev?: Event) => {
+  console.log('onCloseCourseClick')
+  try {
+    ev?.preventDefault()
+    ev?.stopPropagation()
+  } catch {}
+  await closeVideo()
 }
 const onVideoError = () => {
   setOverlay('none')
@@ -427,10 +468,10 @@ const nextQuestion = () => {
       })
     const grade = getGrade(totalScore.value as any)
     const label = (grade as any)?.label || '未知'
-    cas.speak(spks.result(label), {
+    speakCas(spks.result(label), {
       onEnd: () => {
         setTimeout(() => {
-          cas.speak(spks.course)
+          speakCas(spks.course)
         }, 400)
       },
     })
@@ -477,12 +518,61 @@ const speakCas = (
   cas.speak(text, {
     ...options,
     onStart: () => {
+      if (chatMode.value) {
+        asrStop()
+        isListening.value = false
+      }
       options?.onStart && options.onStart()
     },
     onEnd: () => {
       options?.onEnd && options.onEnd()
+      if (chatMode.value) {
+        asrStart()
+        isListening.value = true
+      }
     },
   })
+}
+const speakStream = (
+  text: string,
+  options?: {
+    onStart?: () => void
+    onEnd?: () => void
+  }
+) => {
+  const stream: any = (cas as any)?.createSpeackStream()
+  if (!stream) {
+    speakCas(text, options)
+    return
+  }
+  stream.onStart = () => {
+    if (chatMode.value) {
+      asrStop()
+      isListening.value = false
+    }
+    options?.onStart && options.onStart()
+  }
+  stream.onEnd = () => {
+    options?.onEnd && options.onEnd()
+    if (chatMode.value) {
+      asrStart()
+      isListening.value = true
+    }
+  }
+  const raw = String(text ?? '').trim()
+  const parts = raw
+    .split(/[。！？!？；;，,\n]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+  if (!parts.length) {
+    stream.last(raw)
+    return
+  }
+  for (let i = 0; i < parts.length; i++) {
+    const seg = parts[i]
+    if (i < parts.length - 1) stream.next(seg)
+    else stream.last(seg)
+  }
 }
 let AsrTTS: any
 const chatMode = ref(false)
@@ -509,6 +599,7 @@ const enterChatMode = () => {
 const stopChatMode = () => {
   chatMode.value = false
   isListening.value = false
+  cas.stopAct()
   asrStop()
 }
 onMounted(async () => {
@@ -560,12 +651,18 @@ onMounted(async () => {
     const { content } = data.data
     console.log('reply', content)
 
+    const c = String(content ?? '').toLowerCase()
+    if (c.includes('already exceed sentence asr quota')) {
+      ElMessageBox.alert('对话超限，请联系管理员进行开通', '提示', { type: 'warning' })
+      return
+    }
+
     if (content === replys.请问您是否坐好了.否) {
       handleJsx()
     }
 
     if (content === replys.请问您是否坐好了.是) {
-      cas.speak(replys.请问您是否坐好了.是, {
+      speakCas(replys.请问您是否坐好了.是, {
         onEnd() {
           setTimeout(() => {
             cas.ask(asks.fragrance1)
@@ -575,8 +672,19 @@ onMounted(async () => {
       })
     }
 
+    if (content in [replys.体验课程, replys.课程列表,spks.chooseVideo]) {
+
+        startSurvey()
+        return
+    }
+
     if (content === replys.进入聊天模式) {
       enterChatMode()
+    }
+    const t = String(content ?? '').trim()
+    if (chatMode.value && t) {
+      cas.stopAct()
+      speakStream(t)
     }
   })
 })
@@ -594,6 +702,7 @@ let record: Record
 
 const isListening = ref(false)
 const onTouchStart = () => {
+  cas.stopAct()
   if (chatMode.value) {
     stopChatMode()
     justClosedChat.value = true
@@ -615,6 +724,7 @@ const onTouchEnd = () => {
     .then(text => {
       console.log('语音识别结果', text)
       if (!text) return
+      
 
       const t = String(text)
         .trim()
@@ -708,14 +818,22 @@ const getFsElement = (): Element | null =>
     (document as any).msFullscreenElement ||
     null) as Element | null
 const exitFullscreen = async () => {
-  if ((document as any).exitFullscreen)
-    await (document as any).exitFullscreen()
-  else if ((document as any).webkitExitFullscreen)
-    await (document as any).webkitExitFullscreen()
-  else if ((document as any).mozCancelFullScreen)
-    await (document as any).mozCancelFullScreen()
-  else if ((document as any).msExitFullscreen)
-    await (document as any).msExitFullscreen()
+  const el =
+    (document as any).fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement
+  if (!el) return
+  try {
+    if ((document as any).exitFullscreen)
+      await (document as any).exitFullscreen()
+    else if ((document as any).webkitExitFullscreen)
+      await (document as any).webkitExitFullscreen()
+    else if ((document as any).mozCancelFullScreen)
+      await (document as any).mozCancelFullScreen()
+    else if ((document as any).msExitFullscreen)
+      await (document as any).msExitFullscreen()
+  } catch {}
 }
 const onFsChange = async () => {
   const el = getFsElement()
@@ -756,6 +874,15 @@ onMounted(() => {
     >
       <el-icon><SwitchButton /></el-icon>
       退出系统
+    </el-button>
+    <el-button
+      type="primary"
+      class="account-btn"
+      title="测评选择"
+      aria-label="测评选择"
+      @click="openSurveyPicker"
+    >
+      开始测评
     </el-button>
   </div>
   <div id="container"></div>
@@ -798,14 +925,15 @@ onMounted(() => {
         @click.self="closeVideo"
       >
         <div class="video-modal" ref="courseModalEl">
-          <el-button
+          <button
             class="close-circle"
-            @click="closeVideo"
+            @click.stop.prevent="onCloseCourseClick"
             aria-label="关闭视频"
             title="关闭"
+            type="button"
           >
             ×
-          </el-button>
+          </button>
           <el-button
             v-if="!isCourseFullscreen"
             class="fs-enter-btn"
