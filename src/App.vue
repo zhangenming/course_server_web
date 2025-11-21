@@ -672,8 +672,7 @@ onMounted(async () => {
       })
     }
 
-    if (content in [replys.体验课程, replys.课程列表,spks.chooseVideo]) {
-
+    if ([replys.体验课程, replys.课程列表,spks.chooseVideo].includes(content)) {
         startSurvey()
         return
     }
