@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import NextCas from '@nextcas/sdk'
-import { Record, Asr } from '@nextcas/voice'
+import { Asr } from '@nextcas/voice'
 
 import { onMounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
@@ -92,8 +92,9 @@ const setOverlay = (v: typeof overlay.value) => {
 }
 const videos = ref<any[]>([])
 const openVideoList = async () => {
+  stopChatMode()
   setOverlay('videoList')
-  speakCas(spks.chooseVideo)
+  speakStream(spks.chooseVideo)
   enterIconUI()
   try {
     const data = await apiJson('api/v1/courses/simple')
@@ -110,6 +111,7 @@ const openVideoList = async () => {
 const closeVideoList = () => {
   setOverlay('none')
   exitIconUI()
+  enterChatMode()
 }
 const listPlayerSrc = ref<string | null>(null)
 const showListPlayer = ref(false)
@@ -199,12 +201,12 @@ const playVideoFromList = (v: any) => {
   showVideoList.value = false
   showListPlayer.value = true
   selectedCourse.value = v || null
-  speakCas(spks.videoPlaying)
+  speakStream(spks.videoPlaying)
   enterIconUI()
 }
 const onListPlayerError = () => {
   notifyListError('视频播放失败，请稍后重试')
-  speakCas(spks.videoError)
+  speakStream(spks.videoError)
   closeListPlayer()
 }
 
@@ -236,7 +238,7 @@ const execCommand = async (cmd: {
   icon: string
   command?: string
 }) => {
-  speakCas(cmd.label)
+  speakStream(cmd.label)
   showCommandMenu.value = false
   exitIconUI()
   try {
@@ -252,11 +254,13 @@ const execCommand = async (cmd: {
 const closeSurveyPick = () => {
   setOverlay('none')
   exitIconUI()
+  enterChatMode()
 }
 const openSurveyPicker = () => {
+  stopChatMode()
   setOverlay('surveyTheme')
   selectedSurveyId.value = null
-  speakCas(spks.chooseSurvey)
+  speakStream(spks.chooseSurvey)
   enterIconUI()
   loadSurveys()
 }
@@ -277,7 +281,7 @@ const loadCourses = async () => {
 loadCourses()
 // 开始答题
 const startSurvey = () => {
-  speakCas(spks.startSurveyTip)
+  speakStream(spks.startSurveyTip)
   selectedCourse.value = null
   currentQuestionIndex.value = 0
   userAnswers.value = []
@@ -333,7 +337,7 @@ const recordCourseProgress = async () => {
 const onVideoEnded = () => {
   setOverlay('surveyTheme')
   recordCourseProgress().catch(() => {})
-  speakCas(spks.chooseSurvey)
+  speakStream(spks.chooseSurvey)
   loadSurveys()
 }
 const closeVideo = async () => {
@@ -392,7 +396,7 @@ const stopMusic = () => {
 }
 const onMusicEnded = () => {
   isMusicPlaying.value = false
-  speakCas(spks.finishClass)
+  speakStream(spks.finishClass)
 }
 
 // 选择答案：记录选中索引与分值
@@ -468,10 +472,10 @@ const nextQuestion = () => {
       })
     const grade = getGrade(totalScore.value as any)
     const label = (grade as any)?.label || '未知'
-    speakCas(spks.result(label), {
+    speakStream(spks.result(label), {
       onEnd: () => {
         setTimeout(() => {
-          speakCas(spks.course)
+          speakStream(spks.course)
         }, 400)
       },
     })
@@ -515,9 +519,18 @@ const speakCas = (
     onEnd?: () => void
   }
 ) => {
+  console.log('speakCas called with text:', text)
+  
+  if (!cas) {
+    console.error('CAS object not initialized in speakCas')
+    return
+  }
+  
+  console.log('Calling cas.speak with:', text)
   cas.speak(text, {
     ...options,
     onStart: () => {
+      console.log('cas.speak onStart called')
       if (chatMode.value) {
         asrStop()
         isListening.value = false
@@ -525,6 +538,7 @@ const speakCas = (
       options?.onStart && options.onStart()
     },
     onEnd: () => {
+      console.log('cas.speak onEnd called')
       options?.onEnd && options.onEnd()
       if (chatMode.value) {
         asrStart()
@@ -540,12 +554,24 @@ const speakStream = (
     onEnd?: () => void
   }
 ) => {
-  const stream: any = (cas as any)?.createSpeackStream()
+  console.log('speakStream called with text:', text)
+  
+  if (!cas) {
+    console.error('CAS object not initialized')
+    return
+  }
+  
+  const stream: any = (cas as any)?.createSpeakStream()
   if (!stream) {
+    console.log('No stream available, falling back to speakCas')
     speakCas(text, options)
     return
   }
+  
+  console.log('Stream created successfully')
+  
   stream.onStart = () => {
+    console.log('Stream onStart called')
     if (chatMode.value) {
       asrStop()
       isListening.value = false
@@ -553,6 +579,7 @@ const speakStream = (
     options?.onStart && options.onStart()
   }
   stream.onEnd = () => {
+    console.log('Stream onEnd called')
     options?.onEnd && options.onEnd()
     if (chatMode.value) {
       asrStart()
@@ -560,23 +587,20 @@ const speakStream = (
     }
   }
   const raw = String(text ?? '').trim()
-  const parts = raw
-    .split(/[。！？!？；;，,\n]+/)
-    .map(s => s.trim())
-    .filter(Boolean)
-  if (!parts.length) {
+  console.log('Calling stream.last with:', raw)
+  
+  // 检查stream是否有last方法
+  if (typeof stream.last === 'function') {
+    // 为了避免并发超限，不使用分割多句的方式，而是整段文本一次性播报
+    // 这样可以避免同时触发多个语音生成请求
     stream.last(raw)
-    return
-  }
-  for (let i = 0; i < parts.length; i++) {
-    const seg = parts[i]
-    if (i < parts.length - 1) stream.next(seg)
-    else stream.last(seg)
+  } else {
+    console.warn('stream.last is not a function, falling back to speakCas')
+    speakCas(text, options)
   }
 }
 let AsrTTS: any
 const chatMode = ref(false)
-const justClosedChat = ref(false)
 const asrActive = ref(false)
 const asrStart = () => {
   if (!asrActive.value) {
@@ -632,13 +656,12 @@ onMounted(async () => {
 
   cas.on('ready', () => {
     simulateClick()
-    speakCas(spks.welcome, {
+    speakStream(spks.welcome, {
       onStart: () => {
-        console.log('start')
         simulateClick()
       },
       onEnd: () => {
-        console.log('end')
+        enterChatMode()
       },
     })
   })
@@ -662,7 +685,7 @@ onMounted(async () => {
     }
 
     if (content === replys.请问您是否坐好了.是) {
-      speakCas(replys.请问您是否坐好了.是, {
+      speakStream(replys.请问您是否坐好了.是, {
         onEnd() {
           setTimeout(() => {
             cas.ask(asks.fragrance1)
@@ -690,71 +713,24 @@ onMounted(async () => {
 
 function handleJsx() {
   setTimeout(() => {
-    speakCas('请问您是否坐好了')
+    speakStream('请问您是否坐好了')
   }, 1000 * (location.port === '5174' ? 3 : 30))
 }
 
-let record: Record
-;(async () => {
-  record = new Record(await createAccessToken(), 'actor_118544')
-})()
+// 已移除手动录音 Record，全面改为连续流式 ASR
 
 const isListening = ref(false)
-const onTouchStart = () => {
-  cas.stopAct()
+// 语音按钮点击：切换是否拾音（聊天模式开关）
+const toggleListening = () => {
   if (chatMode.value) {
     stopChatMode()
-    justClosedChat.value = true
-    return
+  } else {
+    enterChatMode()
   }
-  isListening.value = true
-  asrStop()
-  record.start()
 }
 
 // Handle touch end
-const onTouchEnd = () => {
-  if (justClosedChat.value) {
-    justClosedChat.value = false
-    return
-  }
-  record
-    .stopToText('16k_zh')
-    .then(text => {
-      console.log('语音识别结果', text)
-      if (!text) return
-      
-
-      const t = String(text)
-        .trim()
-        .toLowerCase()
-        .replace(/[，。！？、,.!\-\s]/g, '')
-      const intents = [
-        '体验课程',
-        '体验课',
-        '开始课程',
-        '开始体验课程',
-        '课程学习',
-        '学习课程',
-        '进入课程',
-        '进入课程学习',
-        '开始学习',
-        '我要学习',
-      ]
-      if (intents.some(k => t.includes(k))) {
-        startSurvey()
-        return
-      }
-
-      if (['下课'].includes(t)) {
-        stopChatMode()
-        return
-      }
-      cas.ask(text)
-    })
-    .catch(error => console.error('录音停止时出错:', error))
-  isListening.value = false
-}
+// 已移除手动录音结束逻辑
 
 const normalizeUrl = (s: any) => {
   return String(s ?? '')
@@ -1099,12 +1075,8 @@ onMounted(() => {
   <el-button
     class="voice-button"
     :class="{ listening: isListening }"
-    @mousedown="onTouchStart"
-    @mouseup="onTouchEnd"
-    @mouseleave="onTouchEnd"
-    @touchstart.prevent="onTouchStart"
-    @touchend.prevent="onTouchEnd"
-    aria-label="按住说话"
+    @click="toggleListening"
+    aria-label="切换拾音"
   >
     <span class="voice-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="26" height="26">
