@@ -51,9 +51,7 @@ const getGrade = (score: number) => {
 
 // 当前问题
 const currentQuestion = computed(() => {
-  return (
-    questions.value[currentQuestionIndex.value] || { text: '', options: [] }
-  )
+  return questions.value[currentQuestionIndex.value] || { text: '', options: [] }
 })
 
 // 是否是最后一题
@@ -98,25 +96,52 @@ const openVideoList = async () => {
   enterIconUI()
   try {
     const data = await apiJson('api/v1/courses/simple')
-    const arr = Array.isArray((data.items as any)?.data)
-      ? (data.items as any).data
-      : Array.isArray(data.items)
-      ? (data.items as any)
-      : []
+    const arr = Array.isArray((data.items as any)?.data) ? (data.items as any).data : Array.isArray(data.items) ? (data.items as any) : []
     videos.value = arr
   } catch {
     videos.value = []
   }
 }
 const closeVideoList = () => {
-  setOverlay('none')
-  exitIconUI()
-  enterChatMode()
+  openSurveyPicker()
 }
 const listPlayerSrc = ref<string | null>(null)
 const showListPlayer = ref(false)
 const closeListPlayer = () => {
-  setOverlay('videoList')
+  try {
+    recordCourseProgress().catch(() => {})
+  } catch {}
+  try {
+    const v = listModalEl.value?.querySelector('video') as HTMLVideoElement | null
+    if (v) {
+      v.muted = true
+      v.pause()
+      v.src = ''
+      v.load()
+    }
+  } catch {}
+  try {
+    document.querySelectorAll('video').forEach(el => {
+      const v = el as HTMLVideoElement
+      v.pause()
+      v.muted = true
+      v.removeAttribute('src')
+      v.src = ''
+      v.load()
+    })
+  } catch {}
+  try {
+    if ((document as any).pictureInPictureElement && (document as any).exitPictureInPicture) {
+      (document as any).exitPictureInPicture()
+    }
+  } catch {}
+  try { stopMusic() } catch {}
+  try { cas.stopAct() } catch {}
+  setOverlay('surveyTheme')
+  speakStream(spks.chooseSurvey)
+  try {
+    loadSurveys()
+  } catch {}
   if (
     (document as any).fullscreenElement ||
     (document as any).webkitFullscreenElement ||
@@ -152,13 +177,8 @@ const ensureSeekable = async (ev: Event) => {
   const el = ev.target as HTMLVideoElement
   try {
     if (!el || !el.src || el.src.startsWith('blob:')) return
-    const notSeekable =
-      el.seekable?.length === 0 ||
-      (el.seekable?.length && el.seekable.end(0) === 0)
-    const invalidDuration =
-      !Number.isFinite(el.duration) ||
-      el.duration === Infinity ||
-      Number.isNaN(el.duration as any)
+    const notSeekable = el.seekable?.length === 0 || (el.seekable?.length && el.seekable.end(0) === 0)
+    const invalidDuration = !Number.isFinite(el.duration) || el.duration === Infinity || Number.isNaN(el.duration as any)
     if (!(notSeekable || invalidDuration)) return
     if (_blobConvertSet.has(el)) return
     _blobConvertSet.add(el)
@@ -176,10 +196,7 @@ const ensureSeekable = async (ev: Event) => {
     el.addEventListener(
       'loadedmetadata',
       () => {
-        el.currentTime = Math.min(
-          ct,
-          Number.isFinite(el.duration) ? el.duration - 0.01 : ct
-        )
+        el.currentTime = Math.min(ct, Number.isFinite(el.duration) ? el.duration - 0.01 : ct)
         el.play().catch(() => {})
       },
       { once: true }
@@ -205,7 +222,6 @@ const playVideoFromList = (v: any) => {
   enterIconUI()
 }
 const onListPlayerError = () => {
-  notifyListError('视频播放失败，请稍后重试')
   speakStream(spks.videoError)
   closeListPlayer()
 }
@@ -214,9 +230,7 @@ const enterIconUI = () => {}
 const exitIconUI = () => {}
 
 const showCommandMenu = ref(false)
-const commandList = ref<
-  Array<{ label: string; icon: string; command?: string }>
->([
+const commandList = ref<Array<{ label: string; icon: string; command?: string }>>([
   { label: '柔和模式', icon: '🧡', command: 'soft' },
   { label: '香氛模式3', icon: '🪔', command: 'fragrance3' },
   { label: '香氛模式2', icon: '🪔', command: 'fragrance2' },
@@ -233,14 +247,8 @@ const closeCommandMenu = () => {
   setOverlay('none')
   exitIconUI()
 }
-const execCommand = async (cmd: {
-  label: string
-  icon: string
-  command?: string
-}) => {
+const execCommand = async (cmd: { label: string; icon: string; command?: string }) => {
   speakStream(cmd.label)
-  showCommandMenu.value = false
-  exitIconUI()
   try {
     await apiJson('commons/', {
       method: 'POST',
@@ -249,6 +257,8 @@ const execCommand = async (cmd: {
   } catch (e: any) {
     notifyListError(e?.message || '指令执行失败')
   }
+  setOverlay('none')
+  enterIconUI()
 }
 
 const closeSurveyPick = () => {
@@ -280,7 +290,7 @@ const loadCourses = async () => {
 }
 loadCourses()
 // 开始答题
-const startSurvey = () => {
+const startCouse = () => {
   speakStream(spks.startSurveyTip)
   selectedCourse.value = null
   currentQuestionIndex.value = 0
@@ -288,13 +298,7 @@ const startSurvey = () => {
   setOverlay('videoList')
   openVideoList()
 }
-const chooseCourse = (course: {
-  id: number
-  title: string
-  description: string | null
-  video_url: string | null
-  cover_url: string | null
-}) => {
+const chooseCourse = (course: { id: number; title: string; description: string | null; video_url: string | null; cover_url: string | null }) => {
   if (!course.video_url) return
   selectedCourse.value = course
   setOverlay('courseVideo')
@@ -310,11 +314,9 @@ const ensureUserId = async () => {
   } catch {}
   return meUserId.value
 }
-const postedCourseIds = new Set<number>()
 const recordCourseProgress = async () => {
   const courseId = Number((selectedCourse.value as any)?.id)
   if (!courseId) return
-  if (postedCourseIds.has(courseId)) return
   const uid = await ensureUserId()
   const body = {
     user_id: uid ?? undefined,
@@ -328,7 +330,6 @@ const recordCourseProgress = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    postedCourseIds.add(courseId)
   } catch (e) {
     console.warn('记录课程进度失败', e)
   }
@@ -336,6 +337,7 @@ const recordCourseProgress = async () => {
 
 const onVideoEnded = () => {
   setOverlay('surveyTheme')
+  try { stopMusic() } catch {}
   recordCourseProgress().catch(() => {})
   speakStream(spks.chooseSurvey)
   loadSurveys()
@@ -353,6 +355,22 @@ const closeVideo = async () => {
   try {
     cas.stopAct()
   } catch {}
+  try {
+    document.querySelectorAll('video').forEach(el => {
+      const v = el as HTMLVideoElement
+      v.pause()
+      v.muted = true
+      v.removeAttribute('src')
+      v.src = ''
+      v.load()
+    })
+  } catch {}
+  try {
+    if ((document as any).pictureInPictureElement && (document as any).exitPictureInPicture) {
+      (document as any).exitPictureInPicture()
+    }
+  } catch {}
+  try { stopMusic() } catch {}
   try {
     await recordCourseProgress()
   } catch {}
@@ -397,6 +415,8 @@ const stopMusic = () => {
 const onMusicEnded = () => {
   isMusicPlaying.value = false
   speakStream(spks.finishClass)
+  enterChatMode()
+  cas.ask(asks.下课)
 }
 
 // 选择答案：记录选中索引与分值
@@ -442,8 +462,7 @@ const submitSurveyResponses = async () => {
   const answers = questions.value
     .map((q: any, i: number) => {
       const optIndex = selectedIndex.value[i]
-      const opt =
-        optIndex !== undefined ? (q?.options || [])[optIndex] : undefined
+      const opt = optIndex !== undefined ? (q?.options || [])[optIndex] : undefined
       return {
         question_id: Number(q?.id ?? i + 1),
         option_id: Number(opt?.id ?? optIndex),
@@ -472,10 +491,15 @@ const nextQuestion = () => {
       })
     const grade = getGrade(totalScore.value as any)
     const label = (grade as any)?.label || '未知'
+
     speakStream(spks.result(label), {
       onEnd: () => {
         setTimeout(() => {
-          speakStream(spks.course)
+          speakStream(spks.course, {
+            onEnd: () => {
+              enterChatMode()
+            },
+          })
         }, 400)
       },
     })
@@ -502,6 +526,7 @@ const closeResultModal = () => {
   setOverlay('none')
   exitIconUI()
   handleJsx()
+  enterChatMode()
 }
 
 // 处理日常巡检点击
@@ -520,21 +545,18 @@ const speakCas = (
   }
 ) => {
   console.log('speakCas called with text:', text)
-  
+
   if (!cas) {
     console.error('CAS object not initialized in speakCas')
     return
   }
-  
+
   console.log('Calling cas.speak with:', text)
   cas.speak(text, {
     ...options,
     onStart: () => {
       console.log('cas.speak onStart called')
-      if (chatMode.value) {
-        asrStop()
-        isListening.value = false
-      }
+      asrStop()
       options?.onStart && options.onStart()
     },
     onEnd: () => {
@@ -542,7 +564,6 @@ const speakCas = (
       options?.onEnd && options.onEnd()
       if (chatMode.value) {
         asrStart()
-        isListening.value = true
       }
     },
   })
@@ -555,40 +576,35 @@ const speakStream = (
   }
 ) => {
   console.log('speakStream called with text:', text)
-  
+
   if (!cas) {
     console.error('CAS object not initialized')
     return
   }
-  
+
   const stream: any = (cas as any)?.createSpeakStream()
   if (!stream) {
     console.log('No stream available, falling back to speakCas')
     speakCas(text, options)
     return
   }
-  
+
   console.log('Stream created successfully')
-  
+
   stream.onStart = () => {
     console.log('Stream onStart called')
     if (chatMode.value) {
       asrStop()
-      isListening.value = false
     }
     options?.onStart && options.onStart()
   }
   stream.onEnd = () => {
     console.log('Stream onEnd called')
     options?.onEnd && options.onEnd()
-    if (chatMode.value) {
-      asrStart()
-      isListening.value = true
-    }
   }
   const raw = String(text ?? '').trim()
   console.log('Calling stream.last with:', raw)
-  
+
   // 检查stream是否有last方法
   if (typeof stream.last === 'function') {
     // 为了避免并发超限，不使用分割多句的方式，而是整段文本一次性播报
@@ -601,28 +617,19 @@ const speakStream = (
 }
 let AsrTTS: any
 const chatMode = ref(false)
-const asrActive = ref(false)
 const asrStart = () => {
-  if (!asrActive.value) {
-    AsrTTS?.start()
-    asrActive.value = true
-  }
+  AsrTTS?.start()
 }
 const asrStop = () => {
-  if (asrActive.value) {
-    AsrTTS?.stop()
-    asrActive.value = false
-  }
+  AsrTTS?.stop()
 }
 const enterChatMode = () => {
   console.log('enterChatMode')
   chatMode.value = true
-  isListening.value = true
   asrStart()
 }
 const stopChatMode = () => {
   chatMode.value = false
-  isListening.value = false
   cas.stopAct()
   asrStop()
 }
@@ -641,7 +648,7 @@ onMounted(async () => {
   })
   AsrTTS.on('sentenceEnd', (data: any) => {
     console.log('一句话识别结束', data)
-    if (AsrTTS) {
+    if (data.length >= 1) {
       cas.stopAct()
       cas.ask(data)
     }
@@ -677,7 +684,6 @@ onMounted(async () => {
     const c = String(content ?? '').toLowerCase()
     if (c.includes('already exceed sentence asr quota')) {
       ElMessageBox.alert('对话超限，请联系管理员进行开通', '提示', { type: 'warning' })
-      return
     }
 
     if (content === replys.请问您是否坐好了.否) {
@@ -687,27 +693,33 @@ onMounted(async () => {
     if (content === replys.请问您是否坐好了.是) {
       speakStream(replys.请问您是否坐好了.是, {
         onEnd() {
-          setTimeout(() => {
-            cas.ask(asks.fragrance1)
-            playFirstMusic()
-          }, 200)
+          cas.ask(asks.fragrance1)
+          playFirstMusic()
         },
       })
+
+      return
     }
 
-    if ([replys.体验课程, replys.课程列表,spks.chooseVideo].includes(content)) {
-        startSurvey()
-        return
+    if ([replys.体验课程, replys.课程列表, spks.chooseVideo].includes(content)) {
+      // startCouse()
+      openVideoList()
+    }
+
+    if (content === replys.播放音乐) {
+      playFirstMusic()
     }
 
     if (content === replys.进入聊天模式) {
       enterChatMode()
     }
-    const t = String(content ?? '').trim()
-    if (chatMode.value && t) {
-      cas.stopAct()
-      speakStream(t)
-    }
+    stopChatMode()
+    cas.stopAct()
+    speakStream(content, {
+      onEnd() {
+        enterChatMode()
+      },
+    })
   })
 })
 
@@ -719,9 +731,10 @@ function handleJsx() {
 
 // 已移除手动录音 Record，全面改为连续流式 ASR
 
-const isListening = ref(false)
+const isListening = computed(() => chatMode.value)
 // 语音按钮点击：切换是否拾音（聊天模式开关）
 const toggleListening = () => {
+  return
   if (chatMode.value) {
     stopChatMode()
   } else {
@@ -738,6 +751,7 @@ const normalizeUrl = (s: any) => {
     .replace(/[`'\"]/g, '')
 }
 const playFirstMusic = async () => {
+  console.log('playFirstMusic')
   try {
     const data = await apiJson('api/v1/music/')
     const list = Array.isArray(data?.items) ? data.items : []
@@ -749,6 +763,8 @@ const playFirstMusic = async () => {
       audioEl.value.src = src
       await audioEl.value.play()
       isMusicPlaying.value = true
+
+      stopChatMode()
     }
   } catch {}
 }
@@ -760,6 +776,7 @@ const switchAccount = () => {
 const toggleFabMusic = async () => {
   if (isMusicPlaying.value) {
     stopMusic()
+    enterChatMode()
   } else {
     await playFirstMusic()
   }
@@ -800,28 +817,16 @@ const exitFullscreen = async () => {
     (document as any).msFullscreenElement
   if (!el) return
   try {
-    if ((document as any).exitFullscreen)
-      await (document as any).exitFullscreen()
-    else if ((document as any).webkitExitFullscreen)
-      await (document as any).webkitExitFullscreen()
-    else if ((document as any).mozCancelFullScreen)
-      await (document as any).mozCancelFullScreen()
-    else if ((document as any).msExitFullscreen)
-      await (document as any).msExitFullscreen()
+    if ((document as any).exitFullscreen) await (document as any).exitFullscreen()
+    else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen()
+    else if ((document as any).mozCancelFullScreen) await (document as any).mozCancelFullScreen()
+    else if ((document as any).msExitFullscreen) await (document as any).msExitFullscreen()
   } catch {}
 }
 const onFsChange = async () => {
   const el = getFsElement()
-  const isCourse = !!(
-    el &&
-    courseModalEl.value &&
-    (el === courseModalEl.value || courseModalEl.value.contains(el))
-  )
-  const isList = !!(
-    el &&
-    listModalEl.value &&
-    (el === listModalEl.value || listModalEl.value.contains(el))
-  )
+  const isCourse = !!(el && courseModalEl.value && (el === courseModalEl.value || courseModalEl.value.contains(el)))
+  const isList = !!(el && listModalEl.value && (el === listModalEl.value || listModalEl.value.contains(el)))
   isCourseFullscreen.value = isCourse
   isListFullscreen.value = isList
   if (!el) {
@@ -840,24 +845,9 @@ onMounted(() => {
 <template>
   <div class="app-bg" :style="{ backgroundImage: `url(${appBgUrl})` }"></div>
   <div class="account-switch">
-    <el-button
-      type="default"
-      class="account-btn"
-      title="退出系统"
-      aria-label="退出系统"
-      @click="switchAccount"
-    >
+    <el-button type="default" class="account-btn" title="退出系统" aria-label="退出系统" @click="switchAccount">
       <el-icon><SwitchButton /></el-icon>
       退出系统
-    </el-button>
-    <el-button
-      type="primary"
-      class="account-btn"
-      title="测评选择"
-      aria-label="测评选择"
-      @click="openSurveyPicker"
-    >
-      开始测评
     </el-button>
   </div>
   <div id="container"></div>
@@ -883,9 +873,7 @@ onMounted(() => {
               <div class="info">
                 <div class="title">{{ course.title }}</div>
                 <div class="desc">{{ course.description || '暂无描述' }}</div>
-                <div class="tip" v-if="!course.video_url">
-                  无视频，暂不可体验
-                </div>
+                <div class="tip" v-if="!course.video_url">无视频，暂不可体验</div>
               </div>
             </div>
           </div>
@@ -894,37 +882,13 @@ onMounted(() => {
     </transition>
 
     <transition name="fade-scale">
-      <div
-        v-if="playingVideo && selectedCourse"
-        class="modal-overlay"
-        @click.self="closeVideo"
-      >
+      <div v-if="playingVideo && selectedCourse" class="modal-overlay" @click.self="closeVideo">
         <div class="video-modal" ref="courseModalEl">
-          <button
-            class="close-circle"
-            @click.stop.prevent="onCloseCourseClick"
-            aria-label="关闭视频"
-            title="关闭"
-            type="button"
-          >
-            ×
-          </button>
-          <el-button
-            v-if="!isCourseFullscreen"
-            class="fs-enter-btn"
-            @click="enterCourseFullscreen"
-            aria-label="进入全屏"
-            title="进入全屏"
+          <button class="close-circle" @click.stop.prevent="onCloseCourseClick" aria-label="关闭视频" title="关闭" type="button">×</button>
+          <el-button v-if="!isCourseFullscreen" class="fs-enter-btn" @click="enterCourseFullscreen" aria-label="进入全屏" title="进入全屏"
             >⤢ 全屏</el-button
           >
-          <el-button
-            v-if="isCourseFullscreen"
-            class="fs-exit-btn"
-            @click="exitFullscreen"
-            aria-label="退出全屏"
-            title="退出全屏"
-            >退出全屏</el-button
-          >
+          <el-button v-if="isCourseFullscreen" class="fs-exit-btn" @click="exitFullscreen" aria-label="退出全屏" title="退出全屏">退出全屏</el-button>
           <video
             :key="selectedCourse.id"
             :src="(courseBlobSrc || (selectedCourse.video_url))!"
@@ -946,29 +910,14 @@ onMounted(() => {
       </div>
     </transition>
 
-    <audio
-      ref="audioEl"
-      style="display: none"
-      @ended="onMusicEnded"
-      @error="isMusicPlaying = false"
-    ></audio>
+    <audio ref="audioEl" style="display: none" @ended="onMusicEnded" @error="isMusicPlaying = false"></audio>
 
     <transition name="fade-scale">
-      <div
-        v-if="showSurveyThemeSelect"
-        class="modal-overlay top-overlay survey-overlay"
-        @click.self="closeSurveyPick"
-      >
+      <div v-if="showSurveyThemeSelect" class="modal-overlay top-overlay survey-overlay" @click.self="closeSurveyPick">
         <div class="survey-dialog">
           <div class="dialog-header">
             <h3>测评</h3>
-            <el-button
-              class="close-circle"
-              @click="closeSurveyPick"
-              aria-label="关闭"
-              title="关闭"
-              >×</el-button
-            >
+            <el-button class="close-circle" @click="closeSurveyPick" aria-label="关闭" title="关闭">×</el-button>
           </div>
           <p class="dialog-tip">请在下列表中选择您想要的测评方案</p>
           <div class="dialog-list">
@@ -983,12 +932,7 @@ onMounted(() => {
             </button>
           </div>
           <div class="dialog-actions">
-            <el-button
-              type="primary"
-              :disabled="!selectedSurveyId"
-              @click="startSurveyPick"
-              >开始测评</el-button
-            >
+            <el-button type="primary" :disabled="!selectedSurveyId" @click="startSurveyPick">开始测评</el-button>
           </div>
         </div>
       </div>
@@ -1000,16 +944,8 @@ onMounted(() => {
           <div class="survey-header">
             <h2>问卷答题</h2>
             <div class="header-right">
-              <div class="progress">
-                题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}
-              </div>
-              <el-button
-                class="close-circle"
-                @click="goHome"
-                aria-label="关闭"
-                title="关闭"
-                >×</el-button
-              >
+              <div class="progress">题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</div>
+              <el-button class="close-circle" @click="goHome" aria-label="关闭" title="关闭">×</el-button>
             </div>
           </div>
 
@@ -1026,27 +962,18 @@ onMounted(() => {
                 }"
                 @click="selectAnswer(index, option.value)"
               >
-                <span class="option-label">{{
-                  String.fromCharCode(65 + index)
-                }}</span>
+                <span class="option-label">{{ String.fromCharCode(65 + index) }}</span>
                 <span class="option-text">{{ option.text }}</span>
                 <span class="option-value">{{ option.value }}分</span>
               </div>
             </div>
 
             <div class="navigation">
-              <el-button
-                @click="prevQuestion"
-                :disabled="currentQuestionIndex === 0"
-                >上一题</el-button
-              >
+              <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
 
-              <el-button
-                type="primary"
-                @click="nextQuestion"
-                :disabled="selectedIndex[currentQuestionIndex] === undefined"
-                >{{ isLastQuestion ? '提交' : '下一题' }}</el-button
-              >
+              <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
+                isLastQuestion ? '提交' : '下一题'
+              }}</el-button>
             </div>
           </div>
         </div>
@@ -1058,47 +985,23 @@ onMounted(() => {
         <div class="result-card">
           <div class="result-summary">
             <span class="result-prefix">根据您的情况</span>
-            <span class="grade-badge">{{
-              getGrade(totalScore)?.label || ''
-            }}</span>
+            <span class="grade-badge">{{ getGrade(totalScore)?.label || '' }}</span>
           </div>
           <div class="result-actions">
-            <el-button type="primary" @click="restartSurvey">
-              重新评测
-            </el-button>
+            <el-button type="primary" @click="restartSurvey"> 重新评测 </el-button>
             <el-button type="primary" @click="closeResultModal">继续</el-button>
           </div>
         </div>
       </div>
     </transition>
   </div>
-  <el-button
-    class="voice-button"
-    :class="{ listening: isListening }"
-    @click="toggleListening"
-    aria-label="切换拾音"
-  >
+  <el-button class="voice-button" :class="{ listening: isListening, inactive: !chatMode }" @click="toggleListening" aria-label="切换拾音">
     <span class="voice-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="26" height="26">
         <rect x="9" y="4" width="6" height="10" rx="3" fill="currentColor" />
-        <path
-          d="M5 11a7 7 0 0014 0"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
-        <path
-          d="M12 18v3"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
-        <path
-          d="M8 21h8"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-        />
+        <path d="M5 11a7 7 0 0014 0" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M12 18v3" fill="none" stroke="currentColor" stroke-width="1.6" />
+        <path d="M8 21h8" fill="none" stroke="currentColor" stroke-width="1.6" />
       </svg>
     </span>
   </el-button>
@@ -1106,118 +1009,48 @@ onMounted(() => {
     <div v-show="!hasModal" class="left-fab">
       <button class="fab-btn" title="课程列表" @click="openVideoList">
         <svg viewBox="0 0 24 24" width="22" height="22">
-          <rect
-            x="5"
-            y="7"
-            width="14"
-            height="10"
-            rx="2"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
+          <rect x="5" y="7" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
           <path d="M10 9l6 3-6 3V9" fill="currentColor" />
-        </svg>
-      </button>
-      <button class="fab-btn" title="命令模式" @click="openCommandMenu">
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <rect
-            x="3"
-            y="5"
-            width="18"
-            height="14"
-            rx="3"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
-          <path
-            d="M7 10l3 2-3 2"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
-          <path
-            d="M12 14h5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
-        </svg>
-      </button>
-
-      <button
-        class="fab-btn"
-        :title="isMusicPlaying ? '停止音乐' : '播放音乐'"
-        @click="toggleFabMusic"
-      >
-        <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
-          <path d="M10 8l6 4-6 4V8" fill="currentColor" />
-        </svg>
-        <svg v-else viewBox="0 0 24 24" width="24" height="24">
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
-          <rect x="8" y="7" width="3" height="10" fill="currentColor" />
-          <rect x="13" y="7" width="3" height="10" fill="currentColor" />
         </svg>
       </button>
       <button class="fab-btn" title="测评选择" @click="openSurveyPicker">
         <svg viewBox="0 0 24 24" width="22" height="22">
-          <rect
-            x="6"
-            y="5"
-            width="12"
-            height="14"
-            rx="2"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-          />
+          <rect x="6" y="5" width="12" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />
           <path d="M9 9h6" stroke="currentColor" stroke-width="1.6" />
           <path d="M9 13h6" stroke="currentColor" stroke-width="1.6" />
           <path d="M9 17h6" stroke="currentColor" stroke-width="1.6" />
         </svg>
       </button>
+      <button class="fab-btn" title="命令模式" @click="openCommandMenu">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M7 10l3 2-3 2" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M12 14h5" fill="none" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      </button>
+
+      <button class="fab-btn" :title="isMusicPlaying ? '停止音乐' : '播放音乐'" @click="toggleFabMusic">
+        <svg v-if="!isMusicPlaying" viewBox="0 0 24 24" width="24" height="24">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <path d="M10 8l6 4-6 4V8" fill="currentColor" />
+        </svg>
+        <svg v-else viewBox="0 0 24 24" width="24" height="24">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <rect x="8" y="7" width="3" height="10" fill="currentColor" />
+          <rect x="13" y="7" width="3" height="10" fill="currentColor" />
+        </svg>
+      </button>
     </div>
   </transition>
   <transition name="fade-scale">
-    <div
-      v-if="showVideoList"
-      class="modal-overlay top-overlay"
-      @click.self="closeVideoList"
-    >
+    <div v-if="showVideoList" class="modal-overlay top-overlay" @click.self="closeVideoList">
       <div class="video-list-modal">
         <div class="video-list-header">
           <h2>课程列表</h2>
-          <el-button
-            class="close-circle"
-            @click="closeVideoList"
-            aria-label="关闭"
-            title="关闭"
-            >×</el-button
-          >
+          <el-button class="close-circle" @click="closeVideoList" aria-label="关闭" title="关闭">×</el-button>
         </div>
         <div class="video-grid">
-          <div
-            class="video-item"
-            v-for="v in videos"
-            :key="v.id"
-            @click="playVideoFromList(v)"
-          >
+          <div class="video-item" v-for="v in videos" :key="v.id" @click="playVideoFromList(v)">
             <div class="thumb">
               <img :src="v.i_url || v.cover_url || ''" alt="thumbnail" />
             </div>
@@ -1231,18 +1064,9 @@ onMounted(() => {
     </div>
   </transition>
   <transition name="fade-scale">
-    <div
-      v-if="showCommandMenu"
-      class="cmd-overlay"
-      @click.self="closeCommandMenu"
-    >
+    <div v-if="showCommandMenu" class="cmd-overlay" @click.self="closeCommandMenu">
       <div class="cmd-menu">
-        <div
-          class="cmd-item"
-          v-for="(c, i) in commandList"
-          :key="i"
-          @click="execCommand(c)"
-        >
+        <div class="cmd-item" v-for="(c, i) in commandList" :key="i" @click="execCommand(c)">
           <span class="cmd-icon">{{ c.icon }}</span>
           <span class="cmd-label">{{ c.label }}</span>
         </div>
@@ -1253,35 +1077,13 @@ onMounted(() => {
     {{ listError }}
   </div>
   <transition name="fade-scale">
-    <div
-      v-if="showListPlayer && listPlayerSrc"
-      class="modal-overlay"
-      @click.self="closeListPlayer"
-    >
+    <div v-if="showListPlayer && listPlayerSrc" class="modal-overlay" @click.self="closeListPlayer">
       <div class="video-modal" ref="listModalEl">
-        <el-button
-          class="close-circle"
-          @click="closeListPlayer"
-          aria-label="关闭视频"
-          title="关闭"
-          >×</el-button
-        >
-        <el-button
-          v-if="!isListFullscreen"
-          class="fs-enter-btn"
-          @click="enterListFullscreen"
-          aria-label="进入全屏"
-          title="进入全屏"
+        <el-button class="close-circle" @click="closeListPlayer" aria-label="关闭视频" title="关闭">×</el-button>
+        <el-button v-if="!isListFullscreen" class="fs-enter-btn" @click="enterListFullscreen" aria-label="进入全屏" title="进入全屏"
           >⤢ 全屏</el-button
         >
-        <el-button
-          v-if="isListFullscreen"
-          class="fs-exit-btn"
-          @click="exitFullscreen"
-          aria-label="退出全屏"
-          title="退出全屏"
-          >退出全屏</el-button
-        >
+        <el-button v-if="isListFullscreen" class="fs-exit-btn" @click="exitFullscreen" aria-label="退出全屏" title="退出全屏">退出全屏</el-button>
         <video
           :src="listPlayerSrc!"
           controls
@@ -1626,21 +1428,13 @@ onMounted(() => {
 }
 
 .dialog-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    rgba(99, 102, 241, 0.35),
-    rgba(147, 197, 253, 0.35)
-  );
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.35), rgba(147, 197, 253, 0.35));
   border-radius: 8px;
   border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .dialog-list::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(99, 102, 241, 0.55),
-    rgba(147, 197, 253, 0.55)
-  );
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.55), rgba(147, 197, 253, 0.55));
 }
 
 .dialog-item {
@@ -1903,11 +1697,12 @@ onMounted(() => {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
   justify-content: center;
+  margin-top: 10%;
   padding: 20px;
   z-index: 1400;
   background: rgba(255, 255, 255, 0.08);
+  height: fit-content;
 }
 
 .result-summary {
@@ -1947,14 +1742,11 @@ onMounted(() => {
 .voice-button {
   transform: translateX(-50%);
   z-index: 1100;
-  background: linear-gradient(#ffffffcc, #ffffffcc) padding-box,
-    linear-gradient(180deg, rgba(167, 139, 250, 0.9), rgba(96, 165, 250, 0.9))
-      border-box;
   color: var(--primary);
   border: 2px solid transparent;
   border-radius: 9999px;
-  width: 130px;
-  height: 200px;
+  width: 35px;
+  height: 250px;
   padding: 0;
   box-shadow: 0 10px 26px rgba(124, 58, 237, 0.22);
   cursor: pointer;
@@ -1963,20 +1755,28 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: fixed;
-  right: -127px;
+  right: -16px;
   bottom: 43%;
+  transition: right 0.25s ease, opacity 0.25s ease;
 }
 .voice-icon {
-  position: relative;
-  left: -10px;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .voice-button:hover {
-  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   transform: translateX(-50%) scale(1.02);
 }
 
 .voice-button:active {
   transform: translateX(-50%) scale(0.98);
+}
+
+/* hide half when inactive */
+.voice-button.inactive {
+  opacity: 0.65;
 }
 
 .voice-icon svg {
@@ -1988,11 +1788,7 @@ onMounted(() => {
   position: absolute;
   inset: -4px;
   border-radius: 9999px;
-  background: radial-gradient(
-    closest-side,
-    rgba(124, 58, 237, 0.18),
-    rgba(124, 58, 237, 0) 70%
-  );
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0) 70%);
   z-index: -1;
 }
 
@@ -2223,8 +2019,7 @@ onMounted(() => {
   background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 24px rgba(124, 58, 237, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -2240,8 +2035,7 @@ onMounted(() => {
 
 .fab-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
   filter: brightness(1.05);
 }
 
@@ -2303,21 +2097,13 @@ onMounted(() => {
 }
 
 .video-grid::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    rgba(99, 102, 241, 0.35),
-    rgba(147, 197, 253, 0.35)
-  );
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.35), rgba(147, 197, 253, 0.35));
   border-radius: 8px;
   border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .video-grid::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(99, 102, 241, 0.55),
-    rgba(147, 197, 253, 0.55)
-  );
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.55), rgba(147, 197, 253, 0.55));
 }
 
 .video-item {
@@ -2328,8 +2114,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 240px;
-  transition: transform 0.16s ease, box-shadow 0.16s ease,
-    border-color 0.16s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
 .video-item:nth-child(2n) {
@@ -2387,7 +2172,11 @@ onMounted(() => {
 
 .survey-overlay {
   background: rgba(255, 255, 255, 0.14);
-  backdrop-filter: saturate(160%) blur(6px);
-  -webkit-backdrop-filter: saturate(160%) blur(6px);
+}
+.voice-button.listening {
+  background: #a7e12b;
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.25);
+  border: 2px solid #10b981;
 }
 </style>

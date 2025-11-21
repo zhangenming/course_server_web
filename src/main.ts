@@ -42,7 +42,7 @@ declare global {
       (() => {
         if (params.has('admin')) return Admin
         if (params.has('app')) return App
-        return location.origin === 'file://' ? App : Admin
+        return location.origin !== 'file://' ? App : Admin
       })()
     )
     app.use(ElementPlus, { locale: zhCn })
