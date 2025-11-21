@@ -86,30 +86,33 @@ const isStudentLoginValid = computed(() => {
 
 const submitStudentLogin = async () => {
   if (studentLoginLoading.value) return
-  
+
   let ok = false
   if (loginMode.value === 'phone') {
     ok = validateStudentPhone()
   } else {
     ok = validateStudentUsername()
   }
-  
+
   if (!ok) return
   studentLoginLoading.value = true
   try {
     const data = await apiJson('commons/login_alt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: loginMode.value === 'username' ? studentUsername.value.trim() : null, 
-        phone: loginMode.value === 'phone' ? studentPhone.value.trim() : null 
+      body: JSON.stringify({
+        username:
+          loginMode.value === 'username' ? studentUsername.value.trim() : null,
+        phone: loginMode.value === 'phone' ? studentPhone.value.trim() : null,
       }),
     })
     const token = (data as any)?.token || (data as any)?.data?.token
     if (token) {
       ;(window as any).token = token
       localStorage.token = token
-      setTimeout(() => { location.reload() }, 500)
+      setTimeout(() => {
+        location.reload()
+      }, 500)
     } else {
       const msg = (data as any)?.messgae || (data as any)?.message
       notify(msg || '登录失败')
@@ -135,34 +138,58 @@ const regPhoneError = ref('')
 const studentRegisterLoading = ref(false)
 const validateRegUsername = () => {
   const u = regUsername.value.trim()
-  if (!u) { regUsernameError.value = '请输入用户名'; return false }
-  if (u.length < 3 || u.length > 50) { regUsernameError.value = '用户名长度为3-50'; return false }
+  if (!u) {
+    regUsernameError.value = '请输入用户名'
+    return false
+  }
+  if (u.length < 3 || u.length > 50) {
+    regUsernameError.value = '用户名长度为3-50'
+    return false
+  }
   regUsernameError.value = ''
   return true
 }
 const validateRegName = () => {
   const n = regName.value.trim()
-  if (!n) { regNameError.value = '请输入姓名'; return false }
-  if (n.length < 2 || n.length > 20) { regNameError.value = '姓名长度为2-20'; return false }
+  if (!n) {
+    regNameError.value = '请输入姓名'
+    return false
+  }
+  if (n.length < 2 || n.length > 20) {
+    regNameError.value = '姓名长度为2-20'
+    return false
+  }
   regNameError.value = ''
   return true
 }
 const validateRegRole = () => {
   const r = String(regRole.value || '')
-  if (!r) { regRoleError.value = '请选择角色'; return false }
+  if (!r) {
+    regRoleError.value = '请选择角色'
+    return false
+  }
   regRoleError.value = ''
   return true
 }
 const validateRegGender = () => {
   const g = String(regGender.value || '')
-  if (!g) { regGenderError.value = '请选择性别'; return false }
+  if (!g) {
+    regGenderError.value = '请选择性别'
+    return false
+  }
   regGenderError.value = ''
   return true
 }
 const validateRegPhone = () => {
   const p = regPhone.value.trim()
-  if (!p) { regPhoneError.value = '请输入手机号'; return false }
-  if (!/^1[3-9]\d{9}$/.test(p)) { regPhoneError.value = '手机号格式不正确'; return false }
+  if (!p) {
+    regPhoneError.value = '请输入手机号'
+    return false
+  }
+  if (!/^1[3-9]\d{9}$/.test(p)) {
+    regPhoneError.value = '手机号格式不正确'
+    return false
+  }
   regPhoneError.value = ''
   return true
 }
@@ -171,10 +198,13 @@ const isRegisterValid = computed(() => {
   const n = regName.value.trim()
   const p = regPhone.value.trim()
   return (
-    u.length >= 3 && u.length <= 50 &&
-    n.length >= 2 && n.length <= 20 &&
+    u.length >= 3 &&
+    u.length <= 50 &&
+    n.length >= 2 &&
+    n.length <= 20 &&
     /^1[3-9]\d{9}$/.test(p) &&
-    !!regRole.value && !!regGender.value
+    !!regRole.value &&
+    !!regGender.value
   )
 })
 
@@ -205,7 +235,11 @@ const submitStudentRegister = async () => {
       gender: regGender.value,
       phone: regPhone.value.trim(),
     })
-    const data = await apiJson('api/v1/users/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+    const data = await apiJson('api/v1/users/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
     notify('注册成功：' + maskPhone(regPhone.value.trim()), 'success')
     studentTab.value = 'login'
     studentPhone.value = regPhone.value.trim()
@@ -332,26 +366,52 @@ const socialLogin = (provider: string) => {
 <template>
   <div class="login-page">
     <div class="login-container">
-      <div v-if="error" class="banner" :class="bannerType" role="alert" @click="error = null">
+      <div
+        v-if="error"
+        class="banner"
+        :class="bannerType"
+        role="alert"
+        @click="error = null"
+      >
         <el-icon><Warning /></el-icon>
         {{ error }}
       </div>
 
       <div class="login-card">
         <div class="auth-switch">
-          <button type="button" class="switch-btn" :class="{ active: activeAuth === 'admin' }" @click="activeAuth = 'admin'">管理员登录</button>
-          <button type="button" class="switch-btn" :class="{ active: activeAuth === 'student' }" @click="activeAuth = 'student'">学员登录/注册</button>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ active: activeAuth === 'admin' }"
+            @click="activeAuth = 'admin'"
+          >
+            管理员登录
+          </button>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ active: activeAuth === 'student' }"
+            @click="activeAuth = 'student'"
+          >
+            学员登录/注册
+          </button>
         </div>
         <div class="card-header">
           <div class="logo">
             <img src="/src/assets/logomini.png" alt="Logo" class="logo-image" />
           </div>
           <h1 class="card-title">欢迎回来</h1>
-          <p class="card-subtitle" v-if="activeAuth === 'admin'">请登录您的管理员账户</p>
+          <p class="card-subtitle" v-if="activeAuth === 'admin'">
+            请登录您的管理员账户
+          </p>
           <p class="card-subtitle" v-else>请选择学员登录或注册</p>
         </div>
 
-        <form v-if="activeAuth === 'admin'" class="login-form" @submit.prevent="submit">
+        <form
+          v-if="activeAuth === 'admin'"
+          class="login-form"
+          @submit.prevent="submit"
+        >
           <div class="form-group" :class="{ 'has-error': usernameError }">
             <label for="username" class="form-label">
               <el-icon><User /></el-icon>
@@ -444,23 +504,37 @@ const socialLogin = (provider: string) => {
 
         <div v-else class="login-form">
           <div class="sub-switch">
-            <button type="button" class="switch-btn" :class="{ active: studentTab === 'login' }" @click="studentTab = 'login'">登录</button>
-            <button type="button" class="switch-btn" :class="{ active: studentTab === 'register' }" @click="studentTab = 'register'">注册</button>
+            <button
+              type="button"
+              class="switch-btn"
+              :class="{ active: studentTab === 'login' }"
+              @click="studentTab = 'login'"
+            >
+              登录
+            </button>
+            <button
+              type="button"
+              class="switch-btn"
+              :class="{ active: studentTab === 'register' }"
+              @click="studentTab = 'register'"
+            >
+              注册
+            </button>
           </div>
 
           <div v-if="studentTab === 'login'">
             <div class="login-mode-switch">
-              <button 
-                type="button" 
-                class="mode-button" 
+              <button
+                type="button"
+                class="mode-button"
                 :class="{ active: loginMode === 'phone' }"
                 @click="loginMode = 'phone'"
               >
                 手机号登录
               </button>
-              <button 
-                type="button" 
-                class="mode-button" 
+              <button
+                type="button"
+                class="mode-button"
                 :class="{ active: loginMode === 'username' }"
                 @click="loginMode = 'username'"
               >
@@ -468,7 +542,11 @@ const socialLogin = (provider: string) => {
               </button>
             </div>
 
-            <div v-if="loginMode === 'phone'" class="form-group" :class="{ 'has-error': studentPhoneError }">
+            <div
+              v-if="loginMode === 'phone'"
+              class="form-group"
+              :class="{ 'has-error': studentPhoneError }"
+            >
               <label for="student-phone" class="form-label">
                 <el-icon><User /></el-icon>
                 手机号
@@ -486,7 +564,10 @@ const socialLogin = (provider: string) => {
                   @keyup.enter="isStudentLoginValid && submitStudentLogin()"
                   autocomplete="tel"
                 />
-                <div v-if="studentPhone && !studentPhoneError" class="input-icon success">
+                <div
+                  v-if="studentPhone && !studentPhoneError"
+                  class="input-icon success"
+                >
                   <el-icon><CircleCheck /></el-icon>
                 </div>
               </div>
@@ -496,7 +577,11 @@ const socialLogin = (provider: string) => {
               </div>
             </div>
 
-            <div v-else class="form-group" :class="{ 'has-error': studentUsernameError }">
+            <div
+              v-else
+              class="form-group"
+              :class="{ 'has-error': studentUsernameError }"
+            >
               <label for="student-username" class="form-label">
                 <el-icon><User /></el-icon>
                 用户名
@@ -513,7 +598,10 @@ const socialLogin = (provider: string) => {
                   @keyup.enter="isStudentLoginValid && submitStudentLogin()"
                   autocomplete="username"
                 />
-                <div v-if="studentUsername && !studentUsernameError" class="input-icon success">
+                <div
+                  v-if="studentUsername && !studentUsernameError"
+                  class="input-icon success"
+                >
                   <el-icon><CircleCheck /></el-icon>
                 </div>
               </div>
@@ -540,7 +628,10 @@ const socialLogin = (provider: string) => {
 
           <div v-else>
             <div class="register-grid">
-              <div class="form-group" :class="{ 'has-error': regUsernameError }">
+              <div
+                class="form-group"
+                :class="{ 'has-error': regUsernameError }"
+              >
                 <label for="reg-username" class="form-label">
                   <el-icon><User /></el-icon>
                   用户名
@@ -592,15 +683,31 @@ const socialLogin = (provider: string) => {
                   密码（固定）
                 </label>
                 <div class="input-wrapper">
-                  <input id="reg-password" v-model="regPassword" type="password" class="form-input" disabled />
+                  <input
+                    id="reg-password"
+                    v-model="regPassword"
+                    type="password"
+                    class="form-input"
+                    disabled
+                  />
                 </div>
               </div>
 
               <div class="form-group" :class="{ 'has-error': regRoleError }">
                 <label class="form-label">角色</label>
                 <div class="input-wrapper">
-                  <button type="button" class="form-input role-display" @click="openRoleDialog" aria-haspopup="dialog" :aria-label="'当前角色：' + (regRole === 'student' ? '学生' : '老师')">
-                    <span class="role-text">{{ regRole === 'student' ? '学生' : '老师' }}</span>
+                  <button
+                    type="button"
+                    class="form-input role-display"
+                    @click="openRoleDialog"
+                    aria-haspopup="dialog"
+                    :aria-label="
+                      '当前角色：' + (regRole === 'student' ? '学生' : '老师')
+                    "
+                  >
+                    <span class="role-text">{{
+                      regRole === 'student' ? '学生' : '老师'
+                    }}</span>
                     <span class="role-arrow" aria-hidden="true"></span>
                   </button>
                 </div>
@@ -609,19 +716,37 @@ const socialLogin = (provider: string) => {
                   {{ regRoleError }}
                 </div>
 
-                <el-dialog v-model="roleDialogVisible" title="选择角色" width="360px" :close-on-click-modal="true" :close-on-press-escape="true">
+                <el-dialog
+                  v-model="roleDialogVisible"
+                  title="选择角色"
+                  width="360px"
+                  :close-on-click-modal="true"
+                  :close-on-press-escape="true"
+                >
                   <div class="role-grid">
-                    <button type="button" class="role-card" :class="{ active: regRole === 'student' }" @click="selectRole('student')">
+                    <button
+                      type="button"
+                      class="role-card"
+                      :class="{ active: regRole === 'student' }"
+                      @click="selectRole('student')"
+                    >
                       <span class="role-card-title">学生</span>
                       <span class="role-card-desc">用于学员登录与学习记录</span>
                     </button>
-                    <button type="button" class="role-card" :class="{ active: regRole === 'teacher' }" @click="selectRole('teacher')">
+                    <button
+                      type="button"
+                      class="role-card"
+                      :class="{ active: regRole === 'teacher' }"
+                      @click="selectRole('teacher')"
+                    >
                       <span class="role-card-title">老师</span>
                       <span class="role-card-desc">用于教师登录与教学管理</span>
                     </button>
                   </div>
                   <template #footer>
-                    <el-button @click="roleDialogVisible = false">取消</el-button>
+                    <el-button @click="roleDialogVisible = false"
+                      >取消</el-button
+                    >
                   </template>
                 </el-dialog>
               </div>
@@ -630,11 +755,21 @@ const socialLogin = (provider: string) => {
                 <label class="form-label">性别</label>
                 <div class="gender-row">
                   <label class="radio">
-                    <input type="radio" value="男" v-model="regGender" @change="validateRegGender" />
+                    <input
+                      type="radio"
+                      value="男"
+                      v-model="regGender"
+                      @change="validateRegGender"
+                    />
                     男
                   </label>
                   <label class="radio">
-                    <input type="radio" value="女" v-model="regGender" @change="validateRegGender" />
+                    <input
+                      type="radio"
+                      value="女"
+                      v-model="regGender"
+                      @change="validateRegGender"
+                    />
                     女
                   </label>
                 </div>
@@ -684,12 +819,6 @@ const socialLogin = (provider: string) => {
             </button>
           </div>
         </div>
-
-        <div class="divider">
-          <span class="divider-text">或使用以下方式登录</span>
-        </div>
-
-        
       </div>
 
       <div class="login-footer">
@@ -801,20 +930,67 @@ const socialLogin = (provider: string) => {
   transition: transform 0.3s ease;
 }
 
-.role-display { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
-.role-text { color: #374151; }
-.role-arrow { width: 20px; height: 20px; background-repeat: no-repeat; background-position: center; background-size: 20px 20px; opacity: .8;
+.role-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+.role-text {
+  color: #374151;
+}
+.role-arrow {
+  width: 20px;
+  height: 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 20px 20px;
+  opacity: 0.8;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
-.has-error .role-display { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.1); }
-.has-error .role-display:focus { border-color: #dc2626; }
+.has-error .role-display {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+}
+.has-error .role-display:focus {
+  border-color: #dc2626;
+}
 
-.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.role-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; cursor: pointer; transition: all .2s ease; text-align: left; }
-.role-card:hover { border-color: #d1d5db; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.06); }
-.role-card.active { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
-.role-card-title { font-weight: 600; color: #111827; }
-.role-card-desc { font-size: 12px; color: #6b7280; }
+.role-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.role-card:hover {
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+}
+.role-card.active {
+  border-color: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+}
+.role-card-title {
+  font-weight: 600;
+  color: #111827;
+}
+.role-card-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
 
 .banner {
   position: fixed;
@@ -833,8 +1009,12 @@ const socialLogin = (provider: string) => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   animation: slideDown 0.3s ease-out;
 }
-.banner.error { background: rgba(239, 68, 68, 0.95); }
-.banner.success { background: rgba(5, 150, 105, 0.95); }
+.banner.error {
+  background: rgba(239, 68, 68, 0.95);
+}
+.banner.success {
+  background: rgba(5, 150, 105, 0.95);
+}
 
 @keyframes slideDown {
   from {
@@ -858,32 +1038,80 @@ const socialLogin = (provider: string) => {
   animation: fadeInUp 0.6s ease-out;
 }
 
-.auth-switch { display: flex; gap: 6px; background: #f3f4f6; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
-.switch-btn { flex: 1; border: none; background: transparent; color: #6b7280; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s ease; }
-.switch-btn:hover { color: #4b5563; }
-.switch-btn.active { background: #ffffff; color: #667eea; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-.sub-switch { display: flex; gap: 6px; background: #f3f4f6; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
-.sub-switch .switch-btn { font-size: 13px; }
-.sub-switch .switch-btn.active { background: #ffffff; color: #667eea; }
-.gender-row { display: flex; gap: 16px; align-items: center; }
-.radio { display: flex; align-items: center; gap: 6px; color: #374151; cursor: pointer; }
-.radio input[type="radio"] {
+.auth-switch {
+  display: flex;
+  gap: 6px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.switch-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.switch-btn:hover {
+  color: #4b5563;
+}
+.switch-btn.active {
+  background: #ffffff;
+  color: #667eea;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.sub-switch {
+  display: flex;
+  gap: 6px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.sub-switch .switch-btn {
+  font-size: 13px;
+}
+.sub-switch .switch-btn.active {
+  background: #ffffff;
+  color: #667eea;
+}
+.gender-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #374151;
+  cursor: pointer;
+}
+.radio input[type='radio'] {
   width: 16px;
   height: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
   accent-color: #10b981;
 }
-.radio input[type="radio"]:hover {
+.radio input[type='radio']:hover {
   transform: scale(1.1);
 }
-.radio input[type="radio"]:focus {
+.radio input[type='radio']:focus {
   outline: 2px solid #10b981;
   outline-offset: 2px;
 }
 
 /* 现代下拉框样式 */
-.select-wrapper { position: relative; }
+.select-wrapper {
+  position: relative;
+}
 .modern-select {
   appearance: none;
   -webkit-appearance: none;
@@ -893,19 +1121,35 @@ const socialLogin = (provider: string) => {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(0,0,0,.04);
-  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   background-size: 20px 20px;
 }
-.modern-select:hover { border-color: #d1d5db; background-color: #ffffff; }
-.modern-select:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.12); }
-.modern-select:disabled { cursor: not-allowed; opacity: .6; }
+.modern-select:hover {
+  border-color: #d1d5db;
+  background-color: #ffffff;
+}
+.modern-select:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+}
+.modern-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 
-.has-error .modern-select { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.1); }
-.has-error .modern-select:focus { border-color: #dc2626; }
+.has-error .modern-select {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+}
+.has-error .modern-select:focus {
+  border-color: #dc2626;
+}
 
 @keyframes fadeInUp {
   from {
@@ -1335,7 +1579,7 @@ const socialLogin = (provider: string) => {
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  
+
   .register-grid .form-group:last-child:nth-child(odd) {
     grid-column: 1;
   }
@@ -1450,7 +1694,7 @@ const socialLogin = (provider: string) => {
     --ultra-hd-font-scale: 1.8;
     --ultra-hd-spacing-scale: 1.6;
   }
-  
+
   .login-container {
     max-width: 800px;
     transform: scale(var(--ultra-hd-scale));
@@ -1524,12 +1768,17 @@ const socialLogin = (provider: string) => {
     gap: 12px;
   }
 
-  .radio input[type="radio"] {
+  .radio input[type='radio'] {
     width: 28px;
     height: 28px;
   }
 
-  .modern-select { font-size: 28px; padding: 24px 56px 24px 20px; border-radius: 16px; background-size: 24px 24px; }
+  .modern-select {
+    font-size: 28px;
+    padding: 24px 56px 24px 20px;
+    border-radius: 16px;
+    background-size: 24px 24px;
+  }
 
   .error-message {
     font-size: 20px;
@@ -1655,12 +1904,17 @@ const socialLogin = (provider: string) => {
     gap: 16px;
   }
 
-  .radio input[type="radio"] {
+  .radio input[type='radio'] {
     width: 36px;
     height: 36px;
   }
 
-  .modern-select { font-size: 36px; padding: 32px 64px 32px 24px; border-radius: 20px; background-size: 28px 28px; }
+  .modern-select {
+    font-size: 36px;
+    padding: 32px 64px 32px 24px;
+    border-radius: 20px;
+    background-size: 28px 28px;
+  }
 
   .error-message {
     font-size: 24px;
@@ -1718,7 +1972,7 @@ const socialLogin = (provider: string) => {
     --extreme-font-scale: 4;
     --extreme-spacing-scale: 3.5;
   }
-  
+
   .login-container {
     max-width: 1400px;
     transform: scale(var(--extreme-scale));
@@ -1761,7 +2015,7 @@ const socialLogin = (provider: string) => {
     font-size: clamp(32px, 2.5vw, 40px);
   }
 
-  .radio input[type="radio"] {
+  .radio input[type='radio'] {
     width: clamp(36px, 2.5vw, 48px);
     height: clamp(36px, 2.5vw, 48px);
   }
@@ -1794,16 +2048,16 @@ const socialLogin = (provider: string) => {
     transform: scale(4);
     zoom: 2.5;
   }
-  
+
   .login-card {
     padding: 160px;
     border-radius: 80px;
   }
-  
+
   .card-title {
     font-size: clamp(96px, 6vw, 120px);
   }
-  
+
   .logo-image {
     width: clamp(320px, 20vw, 400px);
     height: clamp(320px, 20vw, 400px);
@@ -1943,21 +2197,36 @@ const socialLogin = (provider: string) => {
     height: 80px;
   }
 
-  .auth-switch { background: #1f2937; }
-  .switch-btn { color: #94a3b8; }
-  .switch-btn:hover { color: #e2e8f0; }
-  .switch-btn.active { background: #334155; color: #818cf8; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .auth-switch {
+    background: #1f2937;
+  }
+  .switch-btn {
+    color: #94a3b8;
+  }
+  .switch-btn:hover {
+    color: #e2e8f0;
+  }
+  .switch-btn.active {
+    background: #334155;
+    color: #818cf8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
 
-  .sub-switch { background: #1f2937; }
-  .sub-switch .switch-btn.active { background: #334155; color: #818cf8; }
+  .sub-switch {
+    background: #1f2937;
+  }
+  .sub-switch .switch-btn.active {
+    background: #334155;
+    color: #818cf8;
+  }
 
-  .radio input[type="radio"] {
+  .radio input[type='radio'] {
     accent-color: #34d399;
   }
-  .radio input[type="radio"]:hover {
+  .radio input[type='radio']:hover {
     transform: scale(1.1);
   }
-  .radio input[type="radio"]:focus {
+  .radio input[type='radio']:focus {
     outline-color: #34d399;
   }
 
