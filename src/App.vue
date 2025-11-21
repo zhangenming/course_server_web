@@ -100,6 +100,7 @@ const listPlayerSrc = ref<string | null>(null)
 const showListPlayer = ref(false)
 const closeListPlayer = () => {
   showListPlayer.value = false
+  exitFullscreen()
   if (listPlayerSrc.value && listPlayerSrc.value.startsWith('blob:')) {
     URL.revokeObjectURL(listPlayerSrc.value)
   }
@@ -273,13 +274,13 @@ loadCourses()
 // 开始答题
 const startSurvey = () => {
   cas.speak(spks.startSurveyTip)
-  showCourseSelect.value = true
   selectedCourse.value = null
   playingVideo.value = false
   showSurvey.value = false
   currentQuestionIndex.value = 0
   userAnswers.value = []
   showResult.value = false
+  openVideoList()
 }
 const chooseCourse = (course: {
   id: number
@@ -337,6 +338,7 @@ const closeVideo = () => {
   showSurveyThemeSelect.value = true
   cas.speak(spks.chooseSurvey)
   loadSurveys()
+  exitFullscreen()
   try {
     if (courseBlobSrc.value && courseBlobSrc.value.startsWith('blob:')) {
       URL.revokeObjectURL(courseBlobSrc.value)
@@ -362,6 +364,12 @@ const stopMusic = () => {
     }
   } catch {}
   isMusicPlaying.value = false
+}
+const onMusicEnded = () => {
+  isMusicPlaying.value = false
+  try {
+    speakCas(spks.finishClass)
+  } catch {}
 }
 
 // 选择答案：记录选中索引与分值
@@ -500,6 +508,23 @@ const speakCas = (
   })
 }
 let AsrTTS: any
+const chatMode = ref(false)
+const justClosedChat = ref(false)
+const enterChatMode = () => {
+  console.log('enterChatMode')
+  chatMode.value = true
+  isListening.value = true
+  try {
+    AsrTTS.start()
+  } catch {}
+}
+const stopChatMode = () => {
+  chatMode.value = false
+  isListening.value = false
+  try {
+    AsrTTS.stop()
+  } catch {}
+}
 onMounted(async () => {
   const token = await createAccessToken()
 
@@ -563,6 +588,10 @@ onMounted(async () => {
         },
       })
     }
+
+    if (content === replys.进入聊天模式) {
+      enterChatMode()
+    }
   })
 })
 
@@ -579,6 +608,11 @@ let record: Record
 
 const isListening = ref(false)
 const onTouchStart = () => {
+  if (chatMode.value) {
+    stopChatMode()
+    justClosedChat.value = true
+    return
+  }
   isListening.value = true
   AsrTTS.stop()
   record.start()
@@ -586,6 +620,10 @@ const onTouchStart = () => {
 
 // Handle touch end
 const onTouchEnd = () => {
+  if (justClosedChat.value) {
+    justClosedChat.value = false
+    return
+  }
   record
     .stopToText('16k_zh')
     .then(text => {
@@ -613,12 +651,8 @@ const onTouchEnd = () => {
         return
       }
 
-      if (['聊天', '对话'].includes(t)) {
-        AsrTTS.start()
-        return
-      }
       if (['下课'].includes(t)) {
-        AsrTTS.stop()
+        stopChatMode()
         return
       }
       cas.ask(text)
@@ -639,10 +673,11 @@ const normalizeUrl = (s: any) => {
 const playFirstMusic = async () => {
   try {
     const data = await apiJson('api/v1/music/')
-    const list = data?.items || []
-    const it = Array.isArray(list) ? list[0] : null
-    if (!it) return
-    const src = normalizeUrl(it?.url)
+    const list = Array.isArray(data?.items) ? data.items : []
+    if (!list.length) return
+    const idx = Math.floor(Math.random() * list.length)
+    const it = list[idx]
+    const src = normalizeUrl((it as any)?.url)
     if (src && audioEl.value) {
       audioEl.value.src = src
       await audioEl.value.play()
@@ -668,6 +703,69 @@ const toggleFabMusic = async () => {
 }
 const appBgUrl = appBg as any as string
 const courseBlobSrc = ref<string | null>(null)
+const courseModalEl = ref<HTMLElement | null>(null)
+const listModalEl = ref<HTMLElement | null>(null)
+const isCourseFullscreen = ref(false)
+const isListFullscreen = ref(false)
+const enterCourseFullscreen = async (ev?: Event) => {
+  try {
+    ev?.preventDefault()
+    ev?.stopPropagation()
+  } catch {}
+  const el = courseModalEl.value
+  if (el && el.requestFullscreen) await el.requestFullscreen().catch(() => {})
+}
+const enterListFullscreen = async (ev?: Event) => {
+  try {
+    ev?.preventDefault()
+    ev?.stopPropagation()
+  } catch {}
+  const el = listModalEl.value
+  if (el && el.requestFullscreen) await el.requestFullscreen().catch(() => {})
+}
+const getFsElement = (): Element | null =>
+  (document.fullscreenElement ||
+    (document as any).webkitFullscreenElement ||
+    (document as any).mozFullScreenElement ||
+    (document as any).msFullscreenElement ||
+    null) as Element | null
+const exitFullscreen = async () => {
+  try {
+    if ((document as any).exitFullscreen)
+      await (document as any).exitFullscreen()
+    else if ((document as any).webkitExitFullscreen)
+      await (document as any).webkitExitFullscreen()
+    else if ((document as any).mozCancelFullScreen)
+      await (document as any).mozCancelFullScreen()
+    else if ((document as any).msExitFullscreen)
+      await (document as any).msExitFullscreen()
+  } catch {}
+}
+const onFsChange = async () => {
+  const el = getFsElement()
+  const isCourse = !!(
+    el &&
+    courseModalEl.value &&
+    (el === courseModalEl.value || courseModalEl.value.contains(el))
+  )
+  const isList = !!(
+    el &&
+    listModalEl.value &&
+    (el === listModalEl.value || listModalEl.value.contains(el))
+  )
+  isCourseFullscreen.value = isCourse
+  isListFullscreen.value = isList
+  if (!el) {
+    isCourseFullscreen.value = false
+    isListFullscreen.value = false
+  }
+}
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFsChange)
+  document.addEventListener('webkitfullscreenchange', onFsChange as any)
+  document.addEventListener('mozfullscreenchange', onFsChange as any)
+  document.addEventListener('MSFullscreenChange', onFsChange as any)
+})
 </script>
 
 <template>
@@ -723,7 +821,7 @@ const courseBlobSrc = ref<string | null>(null)
         class="modal-overlay"
         @click.self="closeVideo"
       >
-        <div class="video-modal">
+        <div class="video-modal" ref="courseModalEl">
           <el-button
             class="close-circle"
             @click="closeVideo"
@@ -732,6 +830,22 @@ const courseBlobSrc = ref<string | null>(null)
           >
             ×
           </el-button>
+          <el-button
+            v-if="!isCourseFullscreen"
+            class="fs-enter-btn"
+            @click="enterCourseFullscreen"
+            aria-label="进入全屏"
+            title="进入全屏"
+            >⤢ 全屏</el-button
+          >
+          <el-button
+            v-if="isCourseFullscreen"
+            class="fs-exit-btn"
+            @click="exitFullscreen"
+            aria-label="退出全屏"
+            title="退出全屏"
+            >退出全屏</el-button
+          >
           <video
             :key="selectedCourse.id"
             :src="(courseBlobSrc || (selectedCourse.video_url))!"
@@ -739,6 +853,7 @@ const courseBlobSrc = ref<string | null>(null)
             autoplay
             muted
             playsinline
+            controlslist="nofullscreen"
             preload="metadata"
             crossorigin="anonymous"
             data-kind="course"
@@ -746,6 +861,7 @@ const courseBlobSrc = ref<string | null>(null)
             @seeking="ensureSeekable"
             @ended="onVideoEnded"
             @error="onVideoError"
+            @dblclick="enterCourseFullscreen($event)"
           ></video>
         </div>
       </div>
@@ -754,7 +870,7 @@ const courseBlobSrc = ref<string | null>(null)
     <audio
       ref="audioEl"
       style="display: none"
-      @ended="isMusicPlaying = false"
+      @ended="onMusicEnded"
       @error="isMusicPlaying = false"
     ></audio>
 
@@ -1067,7 +1183,7 @@ const courseBlobSrc = ref<string | null>(null)
       class="modal-overlay"
       @click.self="closeListPlayer"
     >
-      <div class="video-modal">
+      <div class="video-modal" ref="listModalEl">
         <el-button
           class="close-circle"
           @click="closeListPlayer"
@@ -1075,11 +1191,28 @@ const courseBlobSrc = ref<string | null>(null)
           title="关闭"
           >×</el-button
         >
+        <el-button
+          v-if="!isListFullscreen"
+          class="fs-enter-btn"
+          @click="enterListFullscreen"
+          aria-label="进入全屏"
+          title="进入全屏"
+          >⤢ 全屏</el-button
+        >
+        <el-button
+          v-if="isListFullscreen"
+          class="fs-exit-btn"
+          @click="exitFullscreen"
+          aria-label="退出全屏"
+          title="退出全屏"
+          >退出全屏</el-button
+        >
         <video
           :src="listPlayerSrc!"
           controls
           autoplay
           playsinline
+          controlslist="nofullscreen"
           preload="metadata"
           crossorigin="anonymous"
           data-kind="list"
@@ -1087,6 +1220,7 @@ const courseBlobSrc = ref<string | null>(null)
           @seeking="ensureSeekable"
           @ended="onListPlayerEnded"
           @error="onListPlayerError"
+          @dblclick="enterListFullscreen($event)"
         ></video>
       </div>
     </div>
@@ -1318,6 +1452,42 @@ const courseBlobSrc = ref<string | null>(null)
   top: 12px;
   right: 12px;
   z-index: 2;
+}
+
+.video-modal .fs-exit-btn {
+  position: absolute;
+  top: 12px;
+  right: 56px;
+  z-index: 2;
+}
+
+.video-modal .fs-enter-btn {
+  position: absolute;
+  top: 12px;
+  right: 56px;
+  z-index: 2;
+}
+.fs-enter-btn,
+.fs-exit-btn {
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.video-modal:fullscreen .fs-exit-btn {
+  top: 12px;
+  right: 56px;
+}
+
+.video-modal:-webkit-full-screen .fs-exit-btn {
+  top: 12px;
+  right: 56px;
+}
+
+.video-modal:fullscreen .fs-enter-btn,
+.video-modal:-webkit-full-screen .fs-enter-btn {
+  top: 12px;
+  right: 56px;
 }
 
 .top-overlay {
