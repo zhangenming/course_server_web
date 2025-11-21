@@ -132,11 +132,15 @@ const closeListPlayer = () => {
   } catch {}
   try {
     if ((document as any).pictureInPictureElement && (document as any).exitPictureInPicture) {
-      (document as any).exitPictureInPicture()
+      ;(document as any).exitPictureInPicture()
     }
   } catch {}
-  try { stopMusic() } catch {}
-  try { cas.stopAct() } catch {}
+  try {
+    stopMusic()
+  } catch {}
+  try {
+    cas.stopAct()
+  } catch {}
   setOverlay('surveyTheme')
   speakStream(spks.chooseSurvey)
   try {
@@ -337,7 +341,9 @@ const recordCourseProgress = async () => {
 
 const onVideoEnded = () => {
   setOverlay('surveyTheme')
-  try { stopMusic() } catch {}
+  try {
+    stopMusic()
+  } catch {}
   recordCourseProgress().catch(() => {})
   speakStream(spks.chooseSurvey)
   loadSurveys()
@@ -367,10 +373,12 @@ const closeVideo = async () => {
   } catch {}
   try {
     if ((document as any).pictureInPictureElement && (document as any).exitPictureInPicture) {
-      (document as any).exitPictureInPicture()
+      ;(document as any).exitPictureInPicture()
     }
   } catch {}
-  try { stopMusic() } catch {}
+  try {
+    stopMusic()
+  } catch {}
   try {
     await recordCourseProgress()
   } catch {}
@@ -497,7 +505,7 @@ const nextQuestion = () => {
         setTimeout(() => {
           speakStream(spks.course, {
             onEnd: () => {
-              enterChatMode()
+              // enterChatMode()
             },
           })
         }, 400)
@@ -575,6 +583,8 @@ const speakStream = (
     onEnd?: () => void
   }
 ) => {
+  stopChatMode()
+
   console.log('speakStream called with text:', text)
 
   if (!cas) {
@@ -725,7 +735,11 @@ onMounted(async () => {
 
 function handleJsx() {
   setTimeout(() => {
-    speakStream('请问您是否坐好了')
+    speakStream('请问您是否坐好了', {
+      onEnd() {
+        enterChatMode()
+      },
+    })
   }, 1000 * (location.port === '5174' ? 3 : 30))
 }
 
