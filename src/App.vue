@@ -74,10 +74,24 @@ const audioEl = ref<HTMLAudioElement | null>(null)
 // 移除未使用的测试视频常量
 
 const showVideoList = ref(false)
+const overlay = ref<'none' | 'videoList' | 'courseVideo' | 'listPlayer' | 'surveyTheme' | 'survey' | 'result' | 'commandMenu'>('none')
+const applyOverlay = () => {
+  showVideoList.value = overlay.value === 'videoList'
+  showListPlayer.value = overlay.value === 'listPlayer'
+  playingVideo.value = overlay.value === 'courseVideo'
+  showSurveyThemeSelect.value = overlay.value === 'surveyTheme'
+  showSurvey.value = overlay.value === 'survey'
+  showResult.value = overlay.value === 'result'
+  showCommandMenu.value = overlay.value === 'commandMenu'
+  showCourseSelect.value = false
+}
+const setOverlay = (v: typeof overlay.value) => {
+  overlay.value = v
+  applyOverlay()
+}
 const videos = ref<any[]>([])
 const openVideoList = async () => {
-  showSurveyThemeSelect.value = false
-  showVideoList.value = true
+  setOverlay('videoList')
   cas.speak(spks.chooseVideo)
   enterIconUI()
   try {
@@ -93,22 +107,21 @@ const openVideoList = async () => {
   }
 }
 const closeVideoList = () => {
-  showVideoList.value = false
+  setOverlay('none')
   exitIconUI()
 }
 const listPlayerSrc = ref<string | null>(null)
 const showListPlayer = ref(false)
 const closeListPlayer = () => {
-  showListPlayer.value = false
+  setOverlay('videoList')
   exitFullscreen()
   if (listPlayerSrc.value && listPlayerSrc.value.startsWith('blob:')) {
     URL.revokeObjectURL(listPlayerSrc.value)
   }
   listPlayerSrc.value = null
-  showVideoList.value = true
 }
 const onListPlayerEnded = async () => {
-  showListPlayer.value = false
+  setOverlay('none')
   if (listPlayerSrc.value && listPlayerSrc.value.startsWith('blob:')) {
     URL.revokeObjectURL(listPlayerSrc.value)
   }
@@ -116,23 +129,13 @@ const onListPlayerEnded = async () => {
   try {
     await recordCourseProgress()
   } catch {}
-  showSurveyThemeSelect.value = true
+  setOverlay('surveyTheme')
   try {
     await loadSurveys()
   } catch {}
 }
 
-const hasModal = computed(() => {
-  return (
-    showCourseSelect.value ||
-    (playingVideo.value && !!selectedCourse.value) ||
-    showSurveyThemeSelect.value ||
-    showVideoList.value ||
-    showListPlayer.value ||
-    (showSurvey.value && !showResult.value) ||
-    showResult.value
-  )
-})
+const hasModal = computed(() => overlay.value !== 'none')
 
 const _blobConvertSet = new WeakSet<HTMLVideoElement>()
 const ensureSeekable = async (ev: Event) => {
@@ -155,25 +158,19 @@ const ensureSeekable = async (ev: Event) => {
     const url = URL.createObjectURL(blob)
     const kind = (el.dataset && (el.dataset as any).kind) || ''
     if (kind === 'list') {
-      try {
-        listPlayerSrc.value = url
-      } catch {}
+      listPlayerSrc.value = url
     } else if (kind === 'course') {
-      try {
-        courseBlobSrc.value = url
-      } catch {}
+      courseBlobSrc.value = url
     }
     el.src = url
     el.addEventListener(
       'loadedmetadata',
       () => {
-        try {
-          el.currentTime = Math.min(
-            ct,
-            Number.isFinite(el.duration) ? el.duration - 0.01 : ct
-          )
-          el.play().catch(() => {})
-        } catch {}
+        el.currentTime = Math.min(
+          ct,
+          Number.isFinite(el.duration) ? el.duration - 0.01 : ct
+        )
+        el.play().catch(() => {})
       },
       { once: true }
     )
@@ -219,11 +216,11 @@ const commandList = ref<
   { label: '停止香氛', icon: '🧯', command: 'stop' },
 ])
 const openCommandMenu = () => {
-  showCommandMenu.value = true
+  setOverlay('commandMenu')
   enterIconUI()
 }
 const closeCommandMenu = () => {
-  showCommandMenu.value = false
+  setOverlay('none')
   exitIconUI()
 }
 const execCommand = async (cmd: {
@@ -245,12 +242,11 @@ const execCommand = async (cmd: {
 }
 
 const closeSurveyPick = () => {
-  showSurveyThemeSelect.value = false
+  setOverlay('none')
   exitIconUI()
 }
 const openSurveyPicker = () => {
-  showVideoList.value = false
-  showSurveyThemeSelect.value = true
+  setOverlay('surveyTheme')
   selectedSurveyId.value = null
   cas.speak(spks.chooseSurvey)
   enterIconUI()
@@ -275,11 +271,9 @@ loadCourses()
 const startSurvey = () => {
   cas.speak(spks.startSurveyTip)
   selectedCourse.value = null
-  playingVideo.value = false
-  showSurvey.value = false
   currentQuestionIndex.value = 0
   userAnswers.value = []
-  showResult.value = false
+  setOverlay('videoList')
   openVideoList()
 }
 const chooseCourse = (course: {
@@ -291,8 +285,7 @@ const chooseCourse = (course: {
 }) => {
   if (!course.video_url) return
   selectedCourse.value = course
-  showCourseSelect.value = false
-  playingVideo.value = true
+  setOverlay('courseVideo')
 }
 
 const meUserId = ref<number | null>(null)
@@ -327,49 +320,38 @@ const recordCourseProgress = async () => {
 }
 
 const onVideoEnded = () => {
-  playingVideo.value = false
+  setOverlay('surveyTheme')
   recordCourseProgress().catch(() => {})
-  showSurveyThemeSelect.value = true
   cas.speak(spks.chooseSurvey)
   loadSurveys()
 }
 const closeVideo = () => {
-  playingVideo.value = false
-  showSurveyThemeSelect.value = true
+  setOverlay('surveyTheme')
   cas.speak(spks.chooseSurvey)
   loadSurveys()
   exitFullscreen()
-  try {
-    if (courseBlobSrc.value && courseBlobSrc.value.startsWith('blob:')) {
-      URL.revokeObjectURL(courseBlobSrc.value)
-      courseBlobSrc.value = null
-    }
-  } catch {}
+  if (courseBlobSrc.value && courseBlobSrc.value.startsWith('blob:')) {
+    URL.revokeObjectURL(courseBlobSrc.value)
+    courseBlobSrc.value = null
+  }
 }
 const onVideoError = () => {
-  playingVideo.value = false
-  showCourseSelect.value = true
+  setOverlay('none')
 }
 const backToBegin = () => {
-  showCourseSelect.value = false
+  setOverlay('none')
   selectedCourse.value = null
-  playingVideo.value = false
-  showSurvey.value = false
 }
 const stopMusic = () => {
-  try {
-    if (audioEl.value) {
-      audioEl.value.pause()
-      audioEl.value.src = ''
-    }
-  } catch {}
+  if (audioEl.value) {
+    audioEl.value.pause()
+    audioEl.value.src = ''
+  }
   isMusicPlaying.value = false
 }
 const onMusicEnded = () => {
   isMusicPlaying.value = false
-  try {
-    speakCas(spks.finishClass)
-  } catch {}
+  speakCas(spks.finishClass)
 }
 
 // 选择答案：记录选中索引与分值
@@ -392,11 +374,10 @@ const loadSurveys = async () => {
 const chooseSurveyTheme = async (s: { id: number; theme: string }) => {
   selectedSurveyId.value = s.id
   await fetchSurveyDetail(s.id)
-  showSurveyThemeSelect.value = false
+  setOverlay('survey')
   currentQuestionIndex.value = 0
   userAnswers.value = []
   selectedIndex.value = []
-  showSurvey.value = true
 }
 
 const fetchSurveyDetail = async (surveyId: number) => {
@@ -439,22 +420,20 @@ const nextQuestion = () => {
   if (isLastQuestion.value) {
     submitSurveyResponses()
       .then(() => {
-        showResult.value = true
+        setOverlay('result')
       })
       .catch(() => {
-        showResult.value = true
+        setOverlay('result')
       })
-    try {
-      const grade = getGrade(totalScore.value as any)
-      const label = (grade as any)?.label || '未知'
-      cas.speak(spks.result(label), {
-        onEnd: () => {
-          setTimeout(() => {
-            cas.speak(spks.course)
-          }, 400)
-        },
-      })
-    } catch {}
+    const grade = getGrade(totalScore.value as any)
+    const label = (grade as any)?.label || '未知'
+    cas.speak(spks.result(label), {
+      onEnd: () => {
+        setTimeout(() => {
+          cas.speak(spks.course)
+        }, 400)
+      },
+    })
   } else {
     currentQuestionIndex.value++
   }
@@ -475,8 +454,7 @@ const restartSurvey = () => {
   showResult.value = false
 }
 const closeResultModal = () => {
-  showResult.value = false
-  showSurvey.value = false
+  setOverlay('none')
   exitIconUI()
   handleJsx()
 }
@@ -485,8 +463,7 @@ const closeResultModal = () => {
 
 // 返回首页
 const goHome = () => {
-  showSurvey.value = false
-  showResult.value = false
+  setOverlay('none')
 }
 
 let cas: NextCas
@@ -510,20 +487,29 @@ const speakCas = (
 let AsrTTS: any
 const chatMode = ref(false)
 const justClosedChat = ref(false)
+const asrActive = ref(false)
+const asrStart = () => {
+  if (!asrActive.value) {
+    AsrTTS?.start()
+    asrActive.value = true
+  }
+}
+const asrStop = () => {
+  if (asrActive.value) {
+    AsrTTS?.stop()
+    asrActive.value = false
+  }
+}
 const enterChatMode = () => {
   console.log('enterChatMode')
   chatMode.value = true
   isListening.value = true
-  try {
-    AsrTTS.start()
-  } catch {}
+  asrStart()
 }
 const stopChatMode = () => {
   chatMode.value = false
   isListening.value = false
-  try {
-    AsrTTS.stop()
-  } catch {}
+  asrStop()
 }
 onMounted(async () => {
   const token = await createAccessToken()
@@ -614,7 +600,7 @@ const onTouchStart = () => {
     return
   }
   isListening.value = true
-  AsrTTS.stop()
+  asrStop()
   record.start()
 }
 
@@ -662,13 +648,9 @@ const onTouchEnd = () => {
 }
 
 const normalizeUrl = (s: any) => {
-  try {
-    return String(s ?? '')
-      .trim()
-      .replace(/[`'\"]/g, '')
-  } catch {
-    return ''
-  }
+  return String(s ?? '')
+    .trim()
+    .replace(/[`'\"]/g, '')
 }
 const playFirstMusic = async () => {
   try {
@@ -686,13 +668,9 @@ const playFirstMusic = async () => {
   } catch {}
 }
 const switchAccount = () => {
-  try {
-    delete (window as any).token
-    delete (localStorage as any).token
-  } catch {}
-  try {
-    location.reload()
-  } catch {}
+  delete (window as any).token
+  delete (localStorage as any).token
+  location.reload()
 }
 const toggleFabMusic = async () => {
   if (isMusicPlaying.value) {
@@ -708,20 +686,20 @@ const listModalEl = ref<HTMLElement | null>(null)
 const isCourseFullscreen = ref(false)
 const isListFullscreen = ref(false)
 const enterCourseFullscreen = async (ev?: Event) => {
-  try {
-    ev?.preventDefault()
-    ev?.stopPropagation()
-  } catch {}
+  if (ev) {
+    ev.preventDefault()
+    ev.stopPropagation()
+  }
   const el = courseModalEl.value
-  if (el && el.requestFullscreen) await el.requestFullscreen().catch(() => {})
+  if (el && el.requestFullscreen) await el.requestFullscreen()
 }
 const enterListFullscreen = async (ev?: Event) => {
-  try {
-    ev?.preventDefault()
-    ev?.stopPropagation()
-  } catch {}
+  if (ev) {
+    ev.preventDefault()
+    ev.stopPropagation()
+  }
   const el = listModalEl.value
-  if (el && el.requestFullscreen) await el.requestFullscreen().catch(() => {})
+  if (el && el.requestFullscreen) await el.requestFullscreen()
 }
 const getFsElement = (): Element | null =>
   (document.fullscreenElement ||
@@ -730,16 +708,14 @@ const getFsElement = (): Element | null =>
     (document as any).msFullscreenElement ||
     null) as Element | null
 const exitFullscreen = async () => {
-  try {
-    if ((document as any).exitFullscreen)
-      await (document as any).exitFullscreen()
-    else if ((document as any).webkitExitFullscreen)
-      await (document as any).webkitExitFullscreen()
-    else if ((document as any).mozCancelFullScreen)
-      await (document as any).mozCancelFullScreen()
-    else if ((document as any).msExitFullscreen)
-      await (document as any).msExitFullscreen()
-  } catch {}
+  if ((document as any).exitFullscreen)
+    await (document as any).exitFullscreen()
+  else if ((document as any).webkitExitFullscreen)
+    await (document as any).webkitExitFullscreen()
+  else if ((document as any).mozCancelFullScreen)
+    await (document as any).mozCancelFullScreen()
+  else if ((document as any).msExitFullscreen)
+    await (document as any).msExitFullscreen()
 }
 const onFsChange = async () => {
   const el = getFsElement()

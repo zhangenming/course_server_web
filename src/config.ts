@@ -10,7 +10,7 @@ export const spks = {
   result: (label: string) => `测评完成，您的结果为：${label}`,
   course:
     '根据您的情况，给您推荐甜美风风格精油，请您找好位置坐好，准备开始我们的芳香之旅haha~',
-  finishClass: '调整至下课模式成功',
+  finishClass: '体验结束了, 调整至下课模式成功',
 }
 
 export const replys = {
