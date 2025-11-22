@@ -3,14 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { apiJson } from '@/utils/request'
 import { apiFetch } from '@/utils/request'
 import { ElIcon } from 'element-plus'
-import {
-  User,
-  Lock,
-  View,
-  Hide,
-  Warning,
-  CircleCheck,
-} from '@element-plus/icons-vue'
+import { User, Lock, View, Hide, Warning, CircleCheck } from '@element-plus/icons-vue'
 
 const username = ref('')
 const password = ref('')
@@ -101,8 +94,7 @@ const submitStudentLogin = async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username:
-          loginMode.value === 'username' ? studentUsername.value.trim() : null,
+        username: loginMode.value === 'username' ? studentUsername.value.trim() : null,
         phone: loginMode.value === 'phone' ? studentPhone.value.trim() : null,
       }),
     })
@@ -197,15 +189,7 @@ const isRegisterValid = computed(() => {
   const u = regUsername.value.trim()
   const n = regName.value.trim()
   const p = regPhone.value.trim()
-  return (
-    u.length >= 3 &&
-    u.length <= 50 &&
-    n.length >= 2 &&
-    n.length <= 20 &&
-    /^1[3-9]\d{9}$/.test(p) &&
-    !!regRole.value &&
-    !!regGender.value
-  )
+  return u.length >= 3 && u.length <= 50 && n.length >= 2 && n.length <= 20 && /^1[3-9]\d{9}$/.test(p) && !!regRole.value && !!regGender.value
 })
 
 const roleDialogVisible = ref(false)
@@ -342,9 +326,7 @@ const togglePasswordVisibility = () => {
 const handleEnter = (field: 'username' | 'password') => {
   if (field === 'username') {
     validateUsername()
-    const passwordInput = document.querySelector(
-      'input[type="password"], input[type="text"]'
-    ) as HTMLInputElement
+    const passwordInput = document.querySelector('input[type="password"], input[type="text"]') as HTMLInputElement
     passwordInput?.focus()
   } else {
     validatePassword()
@@ -366,33 +348,15 @@ const socialLogin = (provider: string) => {
 <template>
   <div class="login-page">
     <div class="login-container">
-      <div
-        v-if="error"
-        class="banner"
-        :class="bannerType"
-        role="alert"
-        @click="error = null"
-      >
+      <div v-if="error" class="banner" :class="bannerType" role="alert" @click="error = null">
         <el-icon><Warning /></el-icon>
         {{ error }}
       </div>
 
       <div class="login-card">
         <div class="auth-switch">
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ active: activeAuth === 'admin' }"
-            @click="activeAuth = 'admin'"
-          >
-            管理员登录
-          </button>
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ active: activeAuth === 'student' }"
-            @click="activeAuth = 'student'"
-          >
+          <button type="button" class="switch-btn" :class="{ active: activeAuth === 'admin' }" @click="activeAuth = 'admin'">管理员登录</button>
+          <button type="button" class="switch-btn" :class="{ active: activeAuth === 'student' }" @click="activeAuth = 'student'">
             学员登录/注册
           </button>
         </div>
@@ -401,17 +365,11 @@ const socialLogin = (provider: string) => {
             <img src="/src/assets/logomini.png" alt="Logo" class="logo-image" />
           </div>
           <h1 class="card-title">欢迎回来</h1>
-          <p class="card-subtitle" v-if="activeAuth === 'admin'">
-            请登录您的管理员账户
-          </p>
+          <p class="card-subtitle" v-if="activeAuth === 'admin'">请登录您的管理员账户</p>
           <p class="card-subtitle" v-else>请选择学员登录或注册</p>
         </div>
 
-        <form
-          v-if="activeAuth === 'admin'"
-          class="login-form"
-          @submit.prevent="submit"
-        >
+        <form v-if="activeAuth === 'admin'" class="login-form" @submit.prevent="submit">
           <div class="form-group" :class="{ 'has-error': usernameError }">
             <label for="username" class="form-label">
               <el-icon><User /></el-icon>
@@ -456,12 +414,7 @@ const socialLogin = (provider: string) => {
                 @keyup.enter="handleEnter('password')"
                 autocomplete="current-password"
               />
-              <button
-                type="button"
-                class="password-toggle"
-                @click="togglePasswordVisibility"
-                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
-              >
+              <button type="button" class="password-toggle" @click="togglePasswordVisibility" :aria-label="showPassword ? '隐藏密码' : '显示密码'">
                 <el-icon>
                   <View v-if="!showPassword" />
                   <Hide v-else />
@@ -476,24 +429,13 @@ const socialLogin = (provider: string) => {
 
           <div class="form-options">
             <label class="checkbox-wrapper">
-              <input
-                v-model="rememberMe"
-                type="checkbox"
-                class="checkbox-input"
-              />
+              <input v-model="rememberMe" type="checkbox" class="checkbox-input" />
               <span class="checkbox-label">记住登录状态</span>
             </label>
-            <button type="button" class="link-button" @click="forgotPassword">
-              忘记密码？
-            </button>
+            <button type="button" class="link-button" @click="forgotPassword">忘记密码？</button>
           </div>
 
-          <button
-            type="submit"
-            class="submit-button"
-            :disabled="loading || !isFormValid"
-            :class="{ loading: loading }"
-          >
+          <button type="submit" class="submit-button" :disabled="loading || !isFormValid" :class="{ loading: loading }">
             <span v-if="!loading">登录</span>
             <span v-else class="loading-text">
               <span class="spinner"></span>
@@ -504,49 +446,19 @@ const socialLogin = (provider: string) => {
 
         <div v-else class="login-form">
           <div class="sub-switch">
-            <button
-              type="button"
-              class="switch-btn"
-              :class="{ active: studentTab === 'login' }"
-              @click="studentTab = 'login'"
-            >
-              登录
-            </button>
-            <button
-              type="button"
-              class="switch-btn"
-              :class="{ active: studentTab === 'register' }"
-              @click="studentTab = 'register'"
-            >
-              注册
-            </button>
+            <button type="button" class="switch-btn" :class="{ active: studentTab === 'login' }" @click="studentTab = 'login'">登录</button>
+            <button type="button" class="switch-btn" :class="{ active: studentTab === 'register' }" @click="studentTab = 'register'">注册</button>
           </div>
 
           <div v-if="studentTab === 'login'">
             <div class="login-mode-switch">
-              <button
-                type="button"
-                class="mode-button"
-                :class="{ active: loginMode === 'phone' }"
-                @click="loginMode = 'phone'"
-              >
-                手机号登录
-              </button>
-              <button
-                type="button"
-                class="mode-button"
-                :class="{ active: loginMode === 'username' }"
-                @click="loginMode = 'username'"
-              >
+              <button type="button" class="mode-button" :class="{ active: loginMode === 'phone' }" @click="loginMode = 'phone'">手机号登录</button>
+              <button type="button" class="mode-button" :class="{ active: loginMode === 'username' }" @click="loginMode = 'username'">
                 用户名登录
               </button>
             </div>
 
-            <div
-              v-if="loginMode === 'phone'"
-              class="form-group"
-              :class="{ 'has-error': studentPhoneError }"
-            >
+            <div v-if="loginMode === 'phone'" class="form-group" :class="{ 'has-error': studentPhoneError }">
               <label for="student-phone" class="form-label">
                 <el-icon><User /></el-icon>
                 手机号
@@ -564,10 +476,7 @@ const socialLogin = (provider: string) => {
                   @keyup.enter="isStudentLoginValid && submitStudentLogin()"
                   autocomplete="tel"
                 />
-                <div
-                  v-if="studentPhone && !studentPhoneError"
-                  class="input-icon success"
-                >
+                <div v-if="studentPhone && !studentPhoneError" class="input-icon success">
                   <el-icon><CircleCheck /></el-icon>
                 </div>
               </div>
@@ -577,11 +486,7 @@ const socialLogin = (provider: string) => {
               </div>
             </div>
 
-            <div
-              v-else
-              class="form-group"
-              :class="{ 'has-error': studentUsernameError }"
-            >
+            <div v-else class="form-group" :class="{ 'has-error': studentUsernameError }">
               <label for="student-username" class="form-label">
                 <el-icon><User /></el-icon>
                 用户名
@@ -598,10 +503,7 @@ const socialLogin = (provider: string) => {
                   @keyup.enter="isStudentLoginValid && submitStudentLogin()"
                   autocomplete="username"
                 />
-                <div
-                  v-if="studentUsername && !studentUsernameError"
-                  class="input-icon success"
-                >
+                <div v-if="studentUsername && !studentUsernameError" class="input-icon success">
                   <el-icon><CircleCheck /></el-icon>
                 </div>
               </div>
@@ -628,10 +530,7 @@ const socialLogin = (provider: string) => {
 
           <div v-else>
             <div class="register-grid">
-              <div
-                class="form-group"
-                :class="{ 'has-error': regUsernameError }"
-              >
+              <div class="form-group" :class="{ 'has-error': regUsernameError }">
                 <label for="reg-username" class="form-label">
                   <el-icon><User /></el-icon>
                   用户名
@@ -683,13 +582,7 @@ const socialLogin = (provider: string) => {
                   密码（固定）
                 </label>
                 <div class="input-wrapper">
-                  <input
-                    id="reg-password"
-                    v-model="regPassword"
-                    type="password"
-                    class="form-input"
-                    disabled
-                  />
+                  <input id="reg-password" v-model="regPassword" type="password" class="form-input" disabled />
                 </div>
               </div>
 
@@ -701,13 +594,9 @@ const socialLogin = (provider: string) => {
                     class="form-input role-display"
                     @click="openRoleDialog"
                     aria-haspopup="dialog"
-                    :aria-label="
-                      '当前角色：' + (regRole === 'student' ? '学生' : '老师')
-                    "
+                    :aria-label="'当前角色：' + (regRole === 'student' ? '学生' : '老师')"
                   >
-                    <span class="role-text">{{
-                      regRole === 'student' ? '学生' : '老师'
-                    }}</span>
+                    <span class="role-text">{{ regRole === 'student' ? '学生' : '老师' }}</span>
                     <span class="role-arrow" aria-hidden="true"></span>
                   </button>
                 </div>
@@ -716,37 +605,19 @@ const socialLogin = (provider: string) => {
                   {{ regRoleError }}
                 </div>
 
-                <el-dialog
-                  v-model="roleDialogVisible"
-                  title="选择角色"
-                  width="360px"
-                  :close-on-click-modal="true"
-                  :close-on-press-escape="true"
-                >
+                <el-dialog v-model="roleDialogVisible" title="选择角色" width="360px" :close-on-click-modal="true" :close-on-press-escape="true">
                   <div class="role-grid">
-                    <button
-                      type="button"
-                      class="role-card"
-                      :class="{ active: regRole === 'student' }"
-                      @click="selectRole('student')"
-                    >
+                    <button type="button" class="role-card" :class="{ active: regRole === 'student' }" @click="selectRole('student')">
                       <span class="role-card-title">学生</span>
                       <span class="role-card-desc">用于学员登录与学习记录</span>
                     </button>
-                    <button
-                      type="button"
-                      class="role-card"
-                      :class="{ active: regRole === 'teacher' }"
-                      @click="selectRole('teacher')"
-                    >
+                    <button type="button" class="role-card" :class="{ active: regRole === 'teacher' }" @click="selectRole('teacher')">
                       <span class="role-card-title">老师</span>
                       <span class="role-card-desc">用于教师登录与教学管理</span>
                     </button>
                   </div>
                   <template #footer>
-                    <el-button @click="roleDialogVisible = false"
-                      >取消</el-button
-                    >
+                    <el-button @click="roleDialogVisible = false">取消</el-button>
                   </template>
                 </el-dialog>
               </div>
@@ -755,21 +626,11 @@ const socialLogin = (provider: string) => {
                 <label class="form-label">性别</label>
                 <div class="gender-row">
                   <label class="radio">
-                    <input
-                      type="radio"
-                      value="男"
-                      v-model="regGender"
-                      @change="validateRegGender"
-                    />
+                    <input type="radio" value="男" v-model="regGender" @change="validateRegGender" />
                     男
                   </label>
                   <label class="radio">
-                    <input
-                      type="radio"
-                      value="女"
-                      v-model="regGender"
-                      @change="validateRegGender"
-                    />
+                    <input type="radio" value="女" v-model="regGender" @change="validateRegGender" />
                     女
                   </label>
                 </div>
@@ -1032,8 +893,7 @@ const socialLogin = (provider: string) => {
   backdrop-filter: blur(20px);
   border-radius: 24px;
   padding: 40px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: fadeInUp 0.6s ease-out;
 }
@@ -1122,8 +982,7 @@ const socialLogin = (provider: string) => {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease,
-    background-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;

@@ -13,6 +13,23 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    minify: false,
+    rollupOptions: {
+      output: {
+        assetFileNames: assetInfo => {
+          const n = assetInfo.name || ''
+          if (n.endsWith('logomini.png')) return 'assets/logomini.png'
+          return 'assets/[name]-[hash][extname]'
+        },
+        manualChunks(id) {
+          if (id.includes('/src/config.ts') || id.includes('\\src\\config.ts')) {
+            return 'app-config'
+          }
+        },
+      },
+    },
+  },
   // 新增：开发环境代理配置
   server: {
     https: {

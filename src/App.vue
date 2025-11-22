@@ -2,9 +2,8 @@
 import NextCas from '@nextcas/sdk'
 import { Asr } from '@nextcas/voice'
 
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { createAccessToken } from './token'
-import { simulateClick } from './utils'
 import { replys, spks, asks } from './config'
 import { apiJson } from '@/utils/request'
 import appBg from '@/assets/bg.jpg'
@@ -174,7 +173,7 @@ const onListPlayerEnded = async () => {
   } catch {}
 }
 
-const hasModal = computed(() => overlay.value !== 'none')
+const hasModal = computed(() => (overlay.value !== 'none' && overlay.value !== 'commandMenu') || showEntry.value)
 
 const _blobConvertSet = new WeakSet<HTMLVideoElement>()
 const ensureSeekable = async (ev: Event) => {
@@ -252,7 +251,11 @@ const closeCommandMenu = () => {
   exitIconUI()
 }
 const execCommand = async (cmd: { label: string; icon: string; command?: string }) => {
-  speakStream(cmd.label)
+  speakStream(cmd.label, {
+    onEnd: () => {
+      enterChatMode()
+    },
+  })
   try {
     await apiJson('commons/', {
       method: 'POST',
@@ -576,16 +579,15 @@ const speakCas = (
     },
   })
 }
-const speakStream = (
+const speakStream = async (
   text: string,
   options?: {
     onStart?: () => void
     onEnd?: () => void
   }
 ) => {
+  const { promise, resolve, reject } = Promise.withResolvers()
   stopChatMode()
-
-  console.log('speakStream called with text:', text)
 
   if (!cas) {
     console.error('CAS object not initialized')
@@ -599,18 +601,15 @@ const speakStream = (
     return
   }
 
-  console.log('Stream created successfully')
-
   stream.onStart = () => {
-    console.log('Stream onStart called')
     if (chatMode.value) {
       asrStop()
     }
     options?.onStart && options.onStart()
   }
   stream.onEnd = () => {
-    console.log('Stream onEnd called')
     options?.onEnd && options.onEnd()
+    resolve()
   }
   const raw = String(text ?? '').trim()
   console.log('Calling stream.last with:', raw)
@@ -624,6 +623,8 @@ const speakStream = (
     console.warn('stream.last is not a function, falling back to speakCas')
     speakCas(text, options)
   }
+
+  return promise
 }
 let AsrTTS: any
 const chatMode = ref(false)
@@ -643,6 +644,30 @@ const stopChatMode = () => {
   cas.stopAct()
   asrStop()
 }
+const showEntry = ref(true)
+const entered = ref(false)
+const casReady = ref(false)
+const onEnterApp = async () => {
+  entered.value = true
+  showEntry.value = false
+  await speakStream(spks.welcome)
+  enterChatMode()
+}
+const entryKeyHandler = (ev: KeyboardEvent) => {
+  const k = String(ev.key || '')
+  if (showEntry.value && (k === 'Enter' || k === ' ' || k === 'Spacebar')) {
+    try {
+      ev.preventDefault()
+    } catch {}
+    onEnterApp()
+  }
+}
+onMounted(() => {
+  window.addEventListener('keydown', entryKeyHandler)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', entryKeyHandler)
+})
 onMounted(async () => {
   const token = await createAccessToken()
 
@@ -671,16 +696,16 @@ onMounted(async () => {
     actorId: 'actor_118544',
   })
 
-  cas.on('ready', () => {
-    simulateClick()
-    speakStream(spks.welcome, {
-      onStart: () => {
-        simulateClick()
-      },
-      onEnd: () => {
-        enterChatMode()
-      },
+  cas.on('ready', async () => {
+    apiJson('commons/', {
+      method: 'POST',
+      body: JSON.stringify({ name: '明亮模式' }),
     })
+    casReady.value = true
+    if (entered.value) {
+      await speakStream(spks.welcome)
+      enterChatMode()
+    }
   })
 
   cas.on('error', error => {
@@ -723,6 +748,12 @@ onMounted(async () => {
     if (content === replys.进入聊天模式) {
       enterChatMode()
     }
+
+    if (content === replys.巡检) {
+      cas.ask('下课')
+      return
+    }
+
     stopChatMode()
     cas.stopAct()
     speakStream(content, {
@@ -858,14 +889,21 @@ onMounted(() => {
 
 <template>
   <div class="app-bg" :style="{ backgroundImage: `url(${appBgUrl})` }"></div>
-  <div class="account-switch">
+  <div class="account-switch" v-show="!showEntry">
     <el-button type="default" class="account-btn" title="退出系统" aria-label="退出系统" @click="switchAccount">
       <el-icon><SwitchButton /></el-icon>
-      退出系统
+      <div style="padding-left: 3px">退出系统</div>
     </el-button>
   </div>
   <div id="container"></div>
   <div class="page">
+    <transition name="fade-scale">
+      <div v-if="showEntry" class="entry-overlay">
+        <div class="entry-center">
+          <button class="entry-button" @click="onEnterApp" aria-label="GO" title="GO">GO</button>
+        </div>
+      </div>
+    </transition>
     <transition name="fade-scale">
       <div v-if="showCourseSelect" class="modal-overlay">
         <div class="course-modal">
@@ -943,6 +981,12 @@ onMounted(() => {
               @click="selectedSurveyId = s.id"
             >
               <span class="item-text">{{ s.theme || '未命名问卷' }}</span>
+              <span class="item-check" v-if="selectedSurveyId === s.id">
+                <svg viewBox="0 0 24 24" width="20" height="20">
+                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  <path d="M7 12l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.8" />
+                </svg>
+              </span>
             </button>
           </div>
           <div class="dialog-actions">
@@ -958,7 +1002,6 @@ onMounted(() => {
           <div class="survey-header">
             <h2>问卷答题</h2>
             <div class="header-right">
-              <div class="progress">题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</div>
               <el-button class="close-circle" @click="goHome" aria-label="关闭" title="关闭">×</el-button>
             </div>
           </div>
@@ -984,10 +1027,12 @@ onMounted(() => {
 
             <div class="navigation">
               <el-button @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
-
-              <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
-                isLastQuestion ? '提交' : '下一题'
-              }}</el-button>
+              <div class="nav-right">
+                <span class="progress-inline">题目 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</span>
+                <el-button type="primary" @click="nextQuestion" :disabled="selectedIndex[currentQuestionIndex] === undefined">{{
+                  isLastQuestion ? '提交' : '下一题'
+                }}</el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -1009,7 +1054,13 @@ onMounted(() => {
       </div>
     </transition>
   </div>
-  <el-button class="voice-button" :class="{ listening: isListening, inactive: !chatMode }" @click="toggleListening" aria-label="切换拾音">
+  <el-button
+    v-show="!showEntry"
+    class="voice-button"
+    :class="{ listening: isListening, inactive: !chatMode }"
+    @click="toggleListening"
+    aria-label="切换拾音"
+  >
     <span class="voice-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="26" height="26">
         <rect x="9" y="4" width="6" height="10" rx="3" fill="currentColor" />
@@ -1215,7 +1266,7 @@ onMounted(() => {
   left: 50%;
   top: 60%;
   transform: translate(-50%, -50%);
-  width: 80%;
+  width: 100%;
   height: 80%;
   z-index: 1;
 }
@@ -1332,7 +1383,7 @@ onMounted(() => {
 .video-modal video {
   width: 100%;
   height: auto;
-  max-height: 80vh;
+  max-height: 100vh;
   border-radius: 8px;
   position: relative;
   z-index: 1;
@@ -1361,7 +1412,6 @@ onMounted(() => {
 .fs-enter-btn,
 .fs-exit-btn {
   padding: 6px 12px;
-  border-radius: 16px;
   font-size: 13px;
 }
 
@@ -1387,9 +1437,6 @@ onMounted(() => {
 }
 
 .survey-overlay {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: saturate(130%) blur(1.5px);
-  -webkit-backdrop-filter: saturate(130%) blur(1.5px);
 }
 
 .survey-dialog {
@@ -1454,7 +1501,7 @@ onMounted(() => {
 .dialog-item {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   min-height: 40px;
   padding: 10px 12px;
   border: 1px solid #e5e7eb;
@@ -1472,6 +1519,15 @@ onMounted(() => {
 .dialog-item.selected {
   border-color: #3b82f6;
   background: #eef2ff;
+}
+
+.dialog-item .item-text {
+  flex: 1;
+  text-align: left;
+}
+
+.dialog-item .item-check svg {
+  color: #3b82f6;
 }
 
 .dialog-actions {
@@ -1615,6 +1671,17 @@ onMounted(() => {
   margin-top: 20px;
 }
 
+.nav-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-inline {
+  color: #64748b;
+  font-size: 14px;
+}
+
 .survey-container :deep(.el-button) {
   padding: 12px 22px;
   font-size: 16px;
@@ -1715,8 +1782,136 @@ onMounted(() => {
   margin-top: 10%;
   padding: 20px;
   z-index: 1400;
-  background: rgba(255, 255, 255, 0.08);
   height: fit-content;
+}
+
+.entry-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 33vh;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  will-change: backdrop-filter;
+}
+
+.entry-center {
+  position: absolute;
+  left: 50%;
+  top: 33vh;
+  transform: translate(-50%, -50%);
+}
+
+.entry-button {
+  width: clamp(140px, 20vw, 260px);
+  height: clamp(140px, 20vw, 260px);
+  border-radius: 50%;
+  font-size: clamp(32px, 5vw, 64px);
+  font-weight: 800;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 20px 44px rgba(124, 58, 237, 0.35);
+  cursor: pointer;
+  padding: 0;
+  letter-spacing: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  z-index: 1;
+}
+
+.entry-button:hover {
+  transform: scale(1.02);
+  box-shadow: 0 26px 56px rgba(124, 58, 237, 0.45);
+  filter: brightness(1.04);
+}
+
+.entry-button:active {
+  transform: scale(0.98);
+  filter: brightness(0.96);
+}
+
+.entry-button:focus-visible {
+  outline: 3px solid #a78bfa;
+  outline-offset: 4px;
+}
+
+.entry-button::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 3px solid rgba(167, 139, 250, 0.85);
+  box-shadow: 0 0 18px rgba(167, 139, 250, 0.7);
+  pointer-events: none;
+  animation: entryPulse 1.6s ease-out infinite;
+}
+
+.entry-button::after {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  border: 2px solid rgba(167, 139, 250, 0.7);
+  box-shadow: 0 0 22px rgba(167, 139, 250, 0.6);
+  pointer-events: none;
+  animation: entryPulse 1.6s ease-out infinite;
+  animation-delay: 0.8s;
+  opacity: 0.7;
+}
+
+@keyframes entryPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@keyframes entryPulseStrong {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+.entry-center .entry-wave {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: clamp(240px, 40vw, 560px);
+  height: clamp(240px, 40vw, 560px);
+  border-radius: 50%;
+  border: 4px solid rgba(167, 139, 250, 0.8);
+  box-shadow: 0 0 28px rgba(167, 139, 250, 0.7);
+  pointer-events: none;
+  animation: entryPulseStrong 2s ease-out infinite;
+  z-index: 0;
+}
+.entry-center .entry-wave.w1 {
+  opacity: 0.95;
+}
+.entry-center .entry-wave.w2 {
+  animation-delay: 0.6s;
+  opacity: 0.8;
+}
+.entry-center .entry-wave.w3 {
+  animation-delay: 1.2s;
+  opacity: 0.6;
 }
 
 .result-summary {
@@ -1770,8 +1965,8 @@ onMounted(() => {
   justify-content: center;
   position: fixed;
   right: -16px;
-  bottom: 43%;
-  transition: right 0.25s ease, opacity 0.25s ease;
+  top: 30%;
+  transition: all 0.25s ease, opacity 0.25s ease;
 }
 .voice-icon {
   position: static;
@@ -1844,9 +2039,11 @@ onMounted(() => {
   justify-content: center;
 }
 
-.fade-scale-enter-active,
-.fade-scale-leave-active {
+.fade-scale-enter-active {
   transition: opacity 0.18s ease, transform 0.18s ease, filter 0.18s ease;
+}
+.fade-scale-leave-active {
+  transition: all 1.5s ease;
 }
 
 .fade-scale-enter-from,
@@ -1854,6 +2051,8 @@ onMounted(() => {
   opacity: 0;
   transform: scale(0.98) translateY(8px);
   filter: blur(1px);
+  backdrop-filter: blur(0px) saturate(120%);
+  -webkit-backdrop-filter: blur(0px) saturate(120%);
 }
 
 .fade-down-enter-active,
@@ -2018,8 +2217,7 @@ onMounted(() => {
 .left-fab {
   position: fixed;
   left: 24px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 30%;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2185,12 +2383,12 @@ onMounted(() => {
 }
 
 .survey-overlay {
-  background: rgba(255, 255, 255, 0.14);
 }
 .voice-button.listening {
   background: #a7e12b;
   color: #ffffff;
   box-shadow: 0 12px 30px rgba(16, 185, 129, 0.25);
   border: 2px solid #10b981;
+  scale: 1.3;
 }
 </style>
